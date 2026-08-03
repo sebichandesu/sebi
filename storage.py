@@ -1,4 +1,4 @@
-"""
+﻿"""
 저장 모듈 - 우선순위대로 저장 방식을 자동 선택합니다.
 
 1) Apps Script 모드 (추천, 가장 간단함)
@@ -63,21 +63,48 @@ def is_gsheets_mode() -> bool:
     return _use_apps_script() or _use_gsheets()
 
 
+# 일부 회사 네트워크 보안 프록시는 브라우저가 아닌 요청(예: 파이썬 requests 기본 User-Agent)을
+# 차단하거나 가로채서 빈 응답/로그인 페이지를 돌려줍니다. 브라우저처럼 보이는 헤더를 붙여줍니다.
+_BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json, text/plain, */*",
+}
+
+
+def _parse_apps_script_response(res):
+    try:
+        return res.json()
+    except ValueError:
+        snippet = (res.text or "")[:200]
+        raise RuntimeError(
+            f"Apps Script가 JSON이 아닌 응답을 보냈어요 (상태코드 {res.status_code}). "
+            f"응답 일부: {snippet!r}"
+        )
+
+
 def _apps_script_get(sheet_name: str):
     url = st.secrets["apps_script_url"]
     key = st.secrets["apps_script_key"]
-    res = requests.get(url, params={"sheet": sheet_name, "key": key}, timeout=10)
+    res = requests.get(
+        url,
+        params={"sheet": sheet_name, "key": key},
+        headers=_BROWSER_HEADERS,
+        timeout=10,
+    )
     res.raise_for_status()
-    return res.json()
+    return _parse_apps_script_response(res)
 
 
 def _apps_script_post(sheet_name: str, row: dict):
     url = st.secrets["apps_script_url"]
     key = st.secrets["apps_script_key"]
     payload = {"sheet": sheet_name, "key": key, "row": row}
-    res = requests.post(url, json=payload, timeout=10)
+    res = requests.post(url, json=payload, headers=_BROWSER_HEADERS, timeout=10)
     res.raise_for_status()
-    return res.json()
+    return _parse_apps_script_response(res)
 
 
 @st.cache_resource
