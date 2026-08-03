@@ -34,7 +34,12 @@ import streamlit as st
 DATA_DIR = "data"
 
 SHEET_SCHEMAS = {
-    "Outfits": ["날짜", "옷차림", "메모"],
+    # 색상 컬럼(*색상)은 뒤에 추가된 것으로, 기존 시트 데이터의 컬럼 위치가
+    # 바뀌지 않도록 항상 맨 뒤에 붙입니다 (헤더 자동 보정 로직과 호환).
+    "Outfits": [
+        "날짜", "상의", "하의", "가방", "양말", "신발", "메모",
+        "상의색상", "하의색상", "가방색상", "양말색상", "신발색상",
+    ],
     "Media": ["날짜", "종류", "제목", "별점", "감상평"],
     "Expenses": ["날짜", "카테고리", "금액", "메모"],
     "Habits": ["날짜", "습관", "완료"],
@@ -168,13 +173,24 @@ def _get_gspread_client():
 def _get_worksheet(sheet_name: str):
     client = _get_gspread_client()
     sh = client.open_by_key(st.secrets["sheet_id"])
+    expected_headers = SHEET_SCHEMAS[sheet_name]
     try:
         ws = sh.worksheet(sheet_name)
     except Exception:
         ws = sh.add_worksheet(
-            title=sheet_name, rows=2000, cols=len(SHEET_SCHEMAS[sheet_name])
+            title=sheet_name, rows=2000, cols=len(expected_headers)
         )
-        ws.append_row(SHEET_SCHEMAS[sheet_name])
+        ws.append_row(expected_headers)
+        return ws
+
+    # 스키마(컬럼 구성)가 바뀐 경우, 기존 시트의 헤더 행만 최신 컬럼명으로 맞춰줍니다.
+    # (기존 데이터 행은 그대로 두고 헤더만 갱신 - 열이 늘어난 경우 예전 값은 앞쪽 컬럼에 남아있습니다)
+    try:
+        current_headers = ws.row_values(1)
+    except Exception:
+        current_headers = []
+    if current_headers != expected_headers:
+        ws.update("A1", [expected_headers])
     return ws
 
 
@@ -237,4 +253,28 @@ def append_row(sheet_name: str, row: dict):
     df = load_df(sheet_name)
     new_row = pd.DataFrame([row_values], columns=columns)
     df = pd.concat([df, new_row], ignore_index=True)
+    df.to_csv(path, index=False)
+
+
+def delete_rows(sheet_name: str, indices):
+    """indices: load_df()가 반환한 DataFrame의 (0부터 시작하는) 행 위치 목록."""
+    indices = sorted(set(int(i) for i in indices), reverse=True)
+    if not indices:
+        return
+
+    if _use_oauth() or _use_gsheets():
+        ws = _get_worksheet(sheet_name)
+        # 시트 1행은 헤더이므로, 데이터 i번째 행(0-base)은 실제 시트의 (i+2)번째 행
+        for i in indices:
+            ws.delete_rows(i + 2)
+        return
+
+    if _use_apps_script():
+        st.warning("Apps Script 모드에서는 삭제 기능이 아직 지원되지 않아요.")
+        return
+
+    columns = SHEET_SCHEMAS[sheet_name]
+    path = _local_path(sheet_name)
+    df = load_df(sheet_name)
+    df = df.drop(df.index[indices]).reset_index(drop=True)
     df.to_csv(path, index=False)
