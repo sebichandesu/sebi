@@ -85,26 +85,46 @@ def _parse_apps_script_response(res):
         )
 
 
-def _apps_script_get(sheet_name: str):
+def _apps_script_get(sheet_name: str, retries: int = 2):
     url = st.secrets["apps_script_url"]
     key = st.secrets["apps_script_key"]
-    res = requests.get(
-        url,
-        params={"sheet": sheet_name, "key": key},
-        headers=_BROWSER_HEADERS,
-        timeout=10,
-    )
-    res.raise_for_status()
-    return _parse_apps_script_response(res)
+    last_err = None
+    for attempt in range(retries + 1):
+        try:
+            res = requests.get(
+                url,
+                params={"sheet": sheet_name, "key": key},
+                headers=_BROWSER_HEADERS,
+                timeout=10,
+            )
+            res.raise_for_status()
+            return _parse_apps_script_response(res)
+        except Exception as e:
+            last_err = e
+    raise last_err
 
 
-def _apps_script_post(sheet_name: str, row: dict):
+def _apps_script_post(sheet_name: str, row: dict, retries: int = 2):
+    # 구글이 가끔 정상 요청인데도 확인용 HTML 페이지를 응답으로 끼워넣는 경우가 있어요.
+    # 이 경우 실제로는 시트에 저장은 성공하는 경우가 대부분이라, JSON 파싱에 실패해도
+    # HTTP 상태코드가 정상(2xx)이면 "일단 저장된 것으로 간주"하고 넘어갑니다.
     url = st.secrets["apps_script_url"]
     key = st.secrets["apps_script_key"]
     payload = {"sheet": sheet_name, "key": key, "row": row}
-    res = requests.post(url, json=payload, headers=_BROWSER_HEADERS, timeout=10)
-    res.raise_for_status()
-    return _parse_apps_script_response(res)
+    last_err = None
+    for attempt in range(retries + 1):
+        try:
+            res = requests.post(
+                url, json=payload, headers=_BROWSER_HEADERS, timeout=10
+            )
+            res.raise_for_status()
+            try:
+                return _parse_apps_script_response(res)
+            except RuntimeError:
+                return {"ok": True, "note": "response was not JSON, assumed saved"}
+        except Exception as e:
+            last_err = e
+    raise last_err
 
 
 @st.cache_resource
@@ -167,7 +187,13 @@ def append_row(sheet_name: str, row: dict):
     columns = SHEET_SCHEMAS[sheet_name]
 
     if _use_apps_script():
-        _apps_script_post(sheet_name, row)
+        try:
+            _apps_script_post(sheet_name, row)
+        except Exception as e:
+            st.warning(
+                f"저장 확인 응답을 못 받았어요 (구글 쪽 일시적 문제일 수 있어요). "
+                f"구글 시트를 열어서 실제로 저장됐는지 확인해보세요. ({e})"
+            )
         return
 
     if _use_gsheets():
