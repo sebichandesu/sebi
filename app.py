@@ -889,6 +889,8 @@ with tab1:
 with tab2:
     st.markdown('<p class="section-title">기분 전환이 필요할 때 😊</p>', unsafe_allow_html=True)
 
+    import random
+
     _IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp")
     _MEME_HEADERS = {
         "User-Agent": (
@@ -897,14 +899,21 @@ with tab2:
         ),
         "Accept": "application/json, text/plain, */*",
     }
+    # 기본(영어권) + 한국 관련 서브레딧을 섞어서 랜덤으로 골라요.
+    # (레딧 기반이라 완전한 국내 짤방 느낌은 아니지만, 최소한 한국 관련 짤도 섞여 나와요)
+    _MEME_SUBREDDITS = [
+        "memes", "dankmemes", "me_irl",
+        "KoreanMemes", "hanguk", "hanguk", "KoreanMemes",
+    ]
 
     def _fetch_meme(max_tries: int = 3):
         st.session_state["meme_error"] = None
         last_err = None
         for _ in range(max_tries):
+            sub = random.choice(_MEME_SUBREDDITS)
             try:
                 res = requests.get(
-                    "https://meme-api.com/gimme", timeout=6, headers=_MEME_HEADERS
+                    f"https://meme-api.com/gimme/{sub}", timeout=6, headers=_MEME_HEADERS
                 )
                 res.raise_for_status()
                 data = res.json()
