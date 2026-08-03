@@ -1,15 +1,19 @@
-﻿"""
+"""
 저장 모듈 - 우선순위대로 저장 방식을 자동 선택합니다.
 
-1) Apps Script 모드 (추천, 가장 간단함)
-   secrets.toml 에 apps_script_url / apps_script_key 가 있으면
-   구글 시트에 붙인 Apps Script 웹앱을 통해 저장 (GCP 콘솔/서비스 계정 필요 없음)
+1) OAuth 모드 (추천, 가장 안정적)
+   secrets.toml 에 [google_oauth] (client_id/client_secret/refresh_token) + sheet_id 가 있으면
+   구글 정식 Sheets API를 OAuth로 직접 호출 (Apps Script보다 자동화 접근에 훨씬 안정적)
 
-2) Google Sheets(서비스 계정) 모드
+2) Apps Script 모드 (GCP 콘솔 필요 없지만, 가끔 구글이 자동화 요청을 차단할 수 있음)
+   secrets.toml 에 apps_script_url / apps_script_key 가 있으면
+   구글 시트에 붙인 Apps Script 웹앱을 통해 저장
+
+3) Google Sheets(서비스 계정) 모드
    secrets.toml 에 gcp_service_account / sheet_id 가 있으면
    gspread로 구글 시트에 직접 저장 (GCP 서비스 계정 키가 있어야 함)
 
-3) 로컬 CSV 모드 (기본값, 아무 설정 없을 때)
+4) 로컬 CSV 모드 (기본값, 아무 설정 없을 때)
    data/ 폴더에 CSV로 저장 (테스트용, 영구 저장 아님)
 """
 import os
@@ -37,6 +41,13 @@ SHEET_SCHEMAS = {
 }
 
 
+def _use_oauth() -> bool:
+    try:
+        return "google_oauth" in st.secrets and "sheet_id" in st.secrets
+    except Exception:
+        return False
+
+
 def _use_apps_script() -> bool:
     try:
         return "apps_script_url" in st.secrets and "apps_script_key" in st.secrets
@@ -52,6 +63,8 @@ def _use_gsheets() -> bool:
 
 
 def storage_mode() -> str:
+    if _use_oauth():
+        return "oauth"
     if _use_apps_script():
         return "apps_script"
     if _use_gsheets():
@@ -60,7 +73,7 @@ def storage_mode() -> str:
 
 
 def is_gsheets_mode() -> bool:
-    return _use_apps_script() or _use_gsheets()
+    return _use_oauth() or _use_apps_script() or _use_gsheets()
 
 
 # 일부 회사 네트워크 보안 프록시는 브라우저가 아닌 요청(예: 파이썬 requests 기본 User-Agent)을
@@ -105,9 +118,6 @@ def _apps_script_get(sheet_name: str, retries: int = 2):
 
 
 def _apps_script_post(sheet_name: str, row: dict, retries: int = 2):
-    # 구글이 가끔 정상 요청인데도 확인용 HTML 페이지를 응답으로 끼워넣는 경우가 있어요.
-    # 이 경우 실제로는 시트에 저장은 성공하는 경우가 대부분이라, JSON 파싱에 실패해도
-    # HTTP 상태코드가 정상(2xx)이면 "일단 저장된 것으로 간주"하고 넘어갑니다.
     url = st.secrets["apps_script_url"]
     key = st.secrets["apps_script_key"]
     payload = {"sheet": sheet_name, "key": key, "row": row}
@@ -130,9 +140,25 @@ def _apps_script_post(sheet_name: str, row: dict, retries: int = 2):
 @st.cache_resource
 def _get_gspread_client():
     import gspread
-    from google.oauth2.service_account import Credentials
 
     scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+
+    if _use_oauth():
+        from google.oauth2.credentials import Credentials
+
+        o = st.secrets["google_oauth"]
+        creds = Credentials(
+            token=None,
+            refresh_token=o["refresh_token"],
+            client_id=o["client_id"],
+            client_secret=o["client_secret"],
+            token_uri="https://oauth2.googleapis.com/token",
+            scopes=scopes,
+        )
+        return gspread.authorize(creds)
+
+    from google.oauth2.service_account import Credentials
+
     creds = Credentials.from_service_account_info(
         dict(st.secrets["gcp_service_account"]), scopes=scopes
     )
@@ -160,19 +186,23 @@ def _local_path(sheet_name: str) -> str:
 def load_df(sheet_name: str) -> pd.DataFrame:
     columns = SHEET_SCHEMAS[sheet_name]
 
+    if _use_oauth() or _use_gsheets():
+        try:
+            ws = _get_worksheet(sheet_name)
+            records = ws.get_all_records()
+        except Exception as e:
+            st.error(f"구글 시트에서 데이터를 불러오지 못했어요: {e}")
+            return pd.DataFrame(columns=columns)
+        if not records:
+            return pd.DataFrame(columns=columns)
+        return pd.DataFrame(records)
+
     if _use_apps_script():
         try:
             records = _apps_script_get(sheet_name)
         except Exception as e:
             st.error(f"Apps Script에서 데이터를 불러오지 못했어요: {e}")
             return pd.DataFrame(columns=columns)
-        if not records:
-            return pd.DataFrame(columns=columns)
-        return pd.DataFrame(records)
-
-    if _use_gsheets():
-        ws = _get_worksheet(sheet_name)
-        records = ws.get_all_records()
         if not records:
             return pd.DataFrame(columns=columns)
         return pd.DataFrame(records)
@@ -186,6 +216,12 @@ def load_df(sheet_name: str) -> pd.DataFrame:
 def append_row(sheet_name: str, row: dict):
     columns = SHEET_SCHEMAS[sheet_name]
 
+    if _use_oauth() or _use_gsheets():
+        row_values = [row.get(c, "") for c in columns]
+        ws = _get_worksheet(sheet_name)
+        ws.append_row(row_values)
+        return
+
     if _use_apps_script():
         try:
             _apps_script_post(sheet_name, row)
@@ -194,12 +230,6 @@ def append_row(sheet_name: str, row: dict):
                 f"저장 확인 응답을 못 받았어요 (구글 쪽 일시적 문제일 수 있어요). "
                 f"구글 시트를 열어서 실제로 저장됐는지 확인해보세요. ({e})"
             )
-        return
-
-    if _use_gsheets():
-        row_values = [row.get(c, "") for c in columns]
-        ws = _get_worksheet(sheet_name)
-        ws.append_row(row_values)
         return
 
     row_values = [row.get(c, "") for c in columns]

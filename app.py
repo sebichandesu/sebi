@@ -135,7 +135,13 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 # ==================== 사이드바 ====================
 st.sidebar.markdown("### 📒 나만의 기록장")
 _mode = storage.storage_mode()
-if _mode == "apps_script":
+if _mode == "oauth":
+    st.sidebar.markdown(
+        '<span class="sidebar-badge badge-on">🟢 Google Sheets 연결됨 (OAuth)</span>',
+        unsafe_allow_html=True,
+    )
+    st.sidebar.caption("기록이 구글 시트에 영구 저장돼요.")
+elif _mode == "apps_script":
     st.sidebar.markdown(
         '<span class="sidebar-badge badge-on">🟢 Apps Script 연결됨</span>',
         unsafe_allow_html=True,
