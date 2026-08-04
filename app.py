@@ -318,17 +318,22 @@ div[data-testid="stAlertContentSuccess"] svg {
     fill: #10B981 !important;
 }
 
-/* 기록하기 폼을 접었다 펼 수 있는 expander - 카드 톤에 맞춤 */
+/* 기록하기 폼을 접었다 펼 수 있는 expander - 카드 톤에 맞춤
+   (overflow:hidden을 주면 펼쳤을 때 안쪽 내용이 잘려 보이는 문제가 있어서 뺌 - 둥근
+   모서리는 border-radius만으로도 배경/테두리에 충분히 적용돼요) */
 div[data-testid="stExpander"] {
     border: 1px solid var(--border) !important;
     border-radius: 16px !important;
     background-color: var(--surface);
-    overflow: hidden;
     margin-bottom: 0.5rem;
     box-shadow: 0 2px 12px rgba(20, 184, 166, 0.05);
 }
+div[data-testid="stExpanderDetails"] {
+    overflow: visible !important;
+}
 div[data-testid="stExpander"] summary, div[data-testid="stExpander"] > div:first-child {
     font-weight: 700 !important;
+    border-radius: 16px;
 }
 
 /* 결과/기록 영역 카드 - 폼과 시각적으로 구분 */
@@ -599,6 +604,22 @@ div[class*="st-key-love_delete_"] button:hover {
     #mallang-bgm-panel, #mallang-mood-popup {
         max-width: calc(100vw - 40px) !important;
     }
+
+    /* 기분 잔디밭 - 좁은 화면에서 가로 스크롤 없이 한 화면에 들어오도록,
+       칸을 살짝 줄이고 최근 20주만 보여줌(오래된 앞쪽 칸은 숨김) */
+    .mood-grid-wrap {
+        overflow-x: hidden !important;
+    }
+    .mood-grid {
+        gap: 2px !important;
+    }
+    .mood-cell {
+        width: 9px !important;
+        height: 9px !important;
+    }
+    .mood-cell:nth-child(-n+224) {
+        display: none !important;
+    }
 }
 </style>
 """
@@ -690,16 +711,25 @@ components.html(STAR_TRAIL_JS, height=0, width=0)
 
 
 # ==================== 배경음악(BGM) 플레이어 ====================
-# 직접 만든 곡을 BGM으로 사용 - repo의 static/ 폴더에 넣어두고
-# (.streamlit/config.toml 에서 enableStaticServing = true 설정),
-# 앱에서는 "app/static/파일명" 경로로 그대로 재생합니다.
+# 직접 만든 곡을 BGM으로 사용. Streamlit Cloud의 자체 static 서빙(app/static/...)이
+# 배포 환경에서 계속 무한로딩(응답 없음)이라 그쪽은 포기하고, 대신 깃헙 repo가
+# public이라는 점을 이용해 jsDelivr CDN(공개 repo 파일을 그대로 서빙해주는
+# 무료 CDN)에서 바로 mp3를 가져오는 방식으로 바꿈. repo에 static/ 폴더의
+# mp3들이 실제로 커밋/푸시되어 있어야 함.
+GITHUB_USER = "sebichandesu"
+GITHUB_REPO = "sebi"
+GITHUB_BRANCH = "main"
+
 BGM_PLAYLIST = [
     {"name": "🫧 거품", "file": "거품.mp3"},
     {"name": "💧 유선형", "file": "유선형.mp3"},
     {"name": "🎐 우음", "file": "우음.mp3"},
 ]
 for _t in BGM_PLAYLIST:
-    _t["url"] = "app/static/" + _urlquote(_t["file"])
+    _t["url"] = (
+        f"https://cdn.jsdelivr.net/gh/{GITHUB_USER}/{GITHUB_REPO}@{GITHUB_BRANCH}/"
+        f"static/{_urlquote(_t['file'])}"
+    )
 
 BGM_PLAYER_JS = f"""
 <script>
@@ -1854,3 +1884,41 @@ with tab6:
             st.caption("아직 기록이 없어요. 오늘의 사랑을 첫 줄로 남겨보세요 💌")
         else:
             render_love_notes(df)
+
+
+# ==================== 모바일: 기록하기 폼 기본 접힘 ====================
+# 좁은 화면(≤640px)에서는 "기록하기" expander들을 처음 로딩 시 한 번만 자동으로
+# 접어줌(목록을 보기 편하게). 사용자가 직접 펼치면 그 뒤로는 리런돼도 다시
+# 강제로 접지 않음 - 페이지를 완전히 새로고침해야 다시 적용됨.
+EXPANDER_MOBILE_JS = """
+<script>
+(function() {
+    const doc = window.parent.document;
+    if (doc.__expMobileCollapseInit) return;
+    doc.__expMobileCollapseInit = true;
+
+    function collapseIfMobile() {
+        const w = window.parent.innerWidth || doc.documentElement.clientWidth;
+        if (w > 640) { return true; }
+        const expanders = doc.querySelectorAll('div[data-testid="stExpander"]');
+        if (!expanders.length) return false;
+        expanders.forEach(function(exp) {
+            const details = exp.querySelector('div[data-testid="stExpanderDetails"]');
+            const isOpen = details && details.offsetParent !== null;
+            if (isOpen) {
+                const header = exp.querySelector('summary') || exp.firstElementChild;
+                if (header) header.click();
+            }
+        });
+        return true;
+    }
+
+    let tries = 0;
+    const timer = setInterval(function() {
+        tries++;
+        if (collapseIfMobile() || tries > 15) clearInterval(timer);
+    }, 200);
+})();
+</script>
+"""
+components.html(EXPANDER_MOBILE_JS, height=0, width=0)
