@@ -502,6 +502,13 @@ div[data-testid="stDataFrame"] {
     font-weight: 600;
     color: var(--text-main);
 }
+/* 기분 기록 달력 - 기존 잔디밭 히트맵을 월별로 넘겨보는 방식으로 바꾸면서
+   위의 달력 뷰 클래스들을 그대로 재사용. 데이터 있는 칸만 호버 효과를
+   달력 칸 크기에 맞게 살짝 조정 */
+.cal-cell.mood-cell-hasdata:hover {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.12), 0 0 0 1.5px var(--accent);
+}
 .cal-dots {
     display: flex;
     flex-wrap: wrap;
@@ -590,12 +597,14 @@ div[class*="st-key-love_delete_"] button:hover {
        한 줄 그리드로 유지되도록 강제 (기본으로는 칸이 좁아지면 세로로 쌓여서
        달력이 긴 목록처럼 깨져 보임) */
     div[class*="st-key-outfit_cal_nav"] div[data-testid="stHorizontalBlock"],
-    div[class*="st-key-outfit_cal_grid"] div[data-testid="stHorizontalBlock"] {
+    div[class*="st-key-outfit_cal_grid"] div[data-testid="stHorizontalBlock"],
+    div[class*="st-key-mood_cal_nav"] div[data-testid="stHorizontalBlock"] {
         flex-wrap: nowrap !important;
         gap: 3px !important;
     }
     div[class*="st-key-outfit_cal_nav"] div[data-testid="stColumn"],
-    div[class*="st-key-outfit_cal_grid"] div[data-testid="stColumn"] {
+    div[class*="st-key-outfit_cal_grid"] div[data-testid="stColumn"],
+    div[class*="st-key-mood_cal_nav"] div[data-testid="stColumn"] {
         min-width: 0 !important;
         width: auto !important;
         flex: 1 1 0 !important;
@@ -1359,13 +1368,35 @@ MOOD_COLORS = {
 }
 
 
-def render_mood_heatmap(df: pd.DataFrame, weeks: int = 52):
-    """깃허브 잔디밭처럼 최근 N주간의 기분을 칸 색깔로 보여줍니다. 칸을 클릭하면
-    그날 몇 시에 어떤 기분을 기록했는지 팝업으로 보여줘요."""
-    today = date.today()
-    start = today - timedelta(weeks=weeks - 1)
-    start -= timedelta(days=(start.weekday() + 1) % 7)  # 그 주의 일요일로 맞춤
+def render_mood_calendar(df: pd.DataFrame):
+    """옷 기록 달력처럼 ◀▶ 로 월을 넘겨보면서 그 달의 기분을 칸 색깔로 보여줍니다.
+    칸을 클릭하면 그날 몇 시에 어떤 기분을 기록했는지 팝업으로 보여줘요."""
+    key = "mood_cal_ym"
+    if key not in st.session_state:
+        today0 = date.today()
+        st.session_state[key] = (today0.year, today0.month)
+    year, month = st.session_state[key]
 
+    nav_ctx = st.container(key="mood_cal_nav")
+    nav1, nav2, nav3 = nav_ctx.columns([1, 3, 1])
+    with nav1:
+        if st.button("◀", key="mood_cal_prev", use_container_width=True):
+            month -= 1
+            if month == 0:
+                month, year = 12, year - 1
+            st.session_state[key] = (year, month)
+            st.rerun()
+    with nav2:
+        st.markdown(f'<p class="cal-month-label">{year}년 {month}월</p>', unsafe_allow_html=True)
+    with nav3:
+        if st.button("▶", key="mood_cal_next", use_container_width=True):
+            month += 1
+            if month == 13:
+                month, year = 1, year + 1
+            st.session_state[key] = (year, month)
+            st.rerun()
+
+    today = date.today()
     day_scores: dict = {}
     day_entries: dict = {}
     tmp = df.copy()
@@ -1388,39 +1419,44 @@ def render_mood_heatmap(df: pd.DataFrame, weeks: int = 52):
     for d in day_entries:
         day_entries[d].sort(key=lambda e: e["time"])
 
-    total_days = weeks * 7
-    cells_html = ""
-    for i in range(total_days):
-        d = start + timedelta(days=i)
-        if d > today:
-            cells_html += '<div class="mood-cell mood-cell-future"></div>'
-            continue
-        score = mood_by_date.get(d)
-        if score:
-            scores = day_scores[d]
-            color = MOOD_COLORS.get(score, MOOD_COLORS[3])
-            avg_label = MOOD_LABELS.get(score, "")
-            count_note = f" ({len(scores)}회 기록)" if len(scores) > 1 else ""
-            title = f"{d.strftime('%Y-%m-%d')} · {avg_label}{count_note}"
-            payload = html.escape(
-                json.dumps(
-                    {"date": d.strftime("%Y-%m-%d"), "avg": avg_label, "entries": day_entries.get(d, [])},
-                    ensure_ascii=False,
-                )
-            )
-            cells_html += (
-                f'<div class="mood-cell mood-cell-hasdata" style="background:{color};" '
-                f'title="{title}" data-detail="{payload}"></div>'
-            )
-        else:
-            color = "var(--surface)"
-            title = f"{d.strftime('%Y-%m-%d')} · 기록 없음"
-            cells_html += f'<div class="mood-cell" style="background:{color};" title="{title}"></div>'
+    weeks = cal_module.Calendar(firstweekday=6).monthdatescalendar(year, month)
+    weekday_labels = ["일", "월", "화", "수", "목", "금", "토"]
 
-    st.markdown(
-        f'<div class="mood-grid-wrap"><div class="mood-grid">{cells_html}</div></div>',
-        unsafe_allow_html=True,
-    )
+    cells_html = "".join(f'<div class="cal-weekday">{wd}</div>' for wd in weekday_labels)
+    for week in weeks:
+        for d in week:
+            classes = ["cal-cell"]
+            if d.month != month:
+                classes.append("cal-cell-dim")
+            if d == today:
+                classes.append("cal-cell-today")
+
+            attrs = ""
+            daynum_style = ""
+            score = mood_by_date.get(d) if d <= today else None
+            if score:
+                scores = day_scores[d]
+                color = MOOD_COLORS.get(score, MOOD_COLORS[3])
+                avg_label = MOOD_LABELS.get(score, "")
+                count_note = f" ({len(scores)}회 기록)" if len(scores) > 1 else ""
+                title = f"{d.strftime('%Y-%m-%d')} · {avg_label}{count_note}"
+                payload = html.escape(
+                    json.dumps(
+                        {"date": d.strftime("%Y-%m-%d"), "avg": avg_label + count_note, "entries": day_entries.get(d, [])},
+                        ensure_ascii=False,
+                    )
+                )
+                classes.append("mood-cell-hasdata")
+                text_color = "#FFFFFF" if score >= 4 else "#1C2B2A"
+                daynum_style = f' style="color:{text_color};"'
+                attrs = f' style="background:{color};" title="{title}" data-detail="{payload}"'
+
+            cells_html += (
+                f'<div class="{" ".join(classes)}"{attrs}>'
+                f'<span class="cal-daynum"{daynum_style}>{d.day}</span></div>'
+            )
+
+    st.markdown(f'<div class="cal-grid">{cells_html}</div>', unsafe_allow_html=True)
 
     legend_dots = "".join(
         f'<span class="mood-legend-dot" style="background:{MOOD_COLORS[s]};"></span>'
@@ -1737,7 +1773,7 @@ with tab2:
         if df.empty:
             st.caption("아직 기록이 없어요. 오늘 기분부터 남겨보세요 🙂")
         else:
-            render_mood_heatmap(df)
+            render_mood_calendar(df)
             st.write("")
             render_deletable_table("Moods", df)
 
