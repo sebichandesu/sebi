@@ -335,6 +335,19 @@ div[data-testid="stExpander"] summary, div[data-testid="stExpander"] > div:first
     font-weight: 700 !important;
     border-radius: 16px;
 }
+/* 접힌 상태에서 테두리가 2겹으로 보이는 문제: 바깥 div(stExpander)에 이미 테두리를
+   줬는데, 안쪽의 details/첫 자식 div에도 스트림릿 기본 테두리·그림자가 남아있어서
+   겹쳐 보임 - 안쪽 요소들은 전부 테두리 없이 투명하게 만들고, 바깥 테두리 하나만
+   보이도록 정리 */
+div[data-testid="stExpander"] > details,
+div[data-testid="stExpander"] > div,
+div[data-testid="stExpander"] details > div,
+div[data-testid="stExpander"] summary {
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    background: transparent !important;
+}
 
 /* 결과/기록 영역 카드 - 폼과 시각적으로 구분 */
 .st-key-outfit_results, .st-key-media_results,
@@ -605,19 +618,28 @@ div[class*="st-key-love_delete_"] button:hover {
         max-width: calc(100vw - 40px) !important;
     }
 
-    /* 기분 잔디밭 - 좁은 화면에서 가로 스크롤 없이 한 화면에 들어오도록,
-       칸을 살짝 줄이고 최근 20주만 보여줌(오래된 앞쪽 칸은 숨김) */
+    /* 기분 잔디밭 - 좁은 화면에서는 주 단위로 옆으로 길게 늘어나는 기존 방식 대신
+       최근 30일만 6칸씩 줄바꿈되는 달력 느낌의 정사각형 블록으로 보여줌.
+       가로 스크롤이 아예 필요 없고, 칸도 훨씬 크게 보여요. */
     .mood-grid-wrap {
         overflow-x: hidden !important;
     }
     .mood-grid {
-        gap: 2px !important;
+        display: grid !important;
+        grid-auto-flow: row !important;
+        grid-template-columns: repeat(6, 1fr) !important;
+        grid-template-rows: none !important;
+        gap: 6px !important;
+        width: 100% !important;
     }
     .mood-cell {
-        width: 9px !important;
-        height: 9px !important;
+        width: auto !important;
+        height: auto !important;
+        aspect-ratio: 1 / 1 !important;
+        border-radius: 5px !important;
     }
-    .mood-cell:nth-child(-n+224) {
+    /* weeks=52 기준 총 364칸 중 마지막 30칸(최근 30일)만 남기고 숨김 */
+    .mood-cell:nth-child(-n+334) {
         display: none !important;
     }
 }
@@ -1897,18 +1919,20 @@ EXPANDER_MOBILE_JS = """
     if (doc.__expMobileCollapseInit) return;
     doc.__expMobileCollapseInit = true;
 
+    // 탭 안에 있는 expander는 활성 탭이 아니면 화면에 안 보이는 상태(display:none)라
+    // offsetParent로 "펼쳐져있는지" 판단하면 항상 닫힌 것처럼 오판해서 못 접는 문제가
+    // 있었음. 대신 모든 기록하기 expander는 파이썬 쪽에서 항상 expanded=True로
+    // 시작한다는 걸 이미 알고 있으니, 보이는지 여부와 상관없이 무조건 한 번씩 클릭.
     function collapseIfMobile() {
         const w = window.parent.innerWidth || doc.documentElement.clientWidth;
         if (w > 640) { return true; }
         const expanders = doc.querySelectorAll('div[data-testid="stExpander"]');
-        if (!expanders.length) return false;
+        if (expanders.length < 6) return false; // 6개 탭 폼이 다 마운트될 때까지 대기
         expanders.forEach(function(exp) {
-            const details = exp.querySelector('div[data-testid="stExpanderDetails"]');
-            const isOpen = details && details.offsetParent !== null;
-            if (isOpen) {
-                const header = exp.querySelector('summary') || exp.firstElementChild;
-                if (header) header.click();
-            }
+            if (exp.__mallangCollapsed) return;
+            exp.__mallangCollapsed = true;
+            const header = exp.querySelector('summary') || exp.firstElementChild;
+            if (header) header.click();
         });
         return true;
     }
@@ -1916,7 +1940,7 @@ EXPANDER_MOBILE_JS = """
     let tries = 0;
     const timer = setInterval(function() {
         tries++;
-        if (collapseIfMobile() || tries > 15) clearInterval(timer);
+        if (collapseIfMobile() || tries > 25) clearInterval(timer);
     }, 200);
 })();
 </script>
