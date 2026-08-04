@@ -550,16 +550,23 @@ div[class*="st-key-love_note_"] {
     color: var(--text-main);
     white-space: pre-wrap;
 }
-div[class*="st-key-love_delete_"] button {
+div[class*="st-key-love_delete_"] button, div[class*="st-key-love_edit_"] button {
     background-color: transparent !important;
     color: #E11D6D !important;
     border: 1.5px solid #FBCFE8 !important;
     box-shadow: none !important;
     padding: 0.4rem 0.6rem !important;
+    width: 100% !important;
 }
-div[class*="st-key-love_delete_"] button:hover {
+div[class*="st-key-love_delete_"] button:hover, div[class*="st-key-love_edit_"] button:hover {
     background-color: #FFF1F5 !important;
     border-color: #E11D6D !important;
+}
+/* 삭제/수정 버튼이 카드 세로 중앙이 아니라 위쪽(날짜 줄과 나란히)에 붙도록 */
+div[class*="st-key-love_note_"] div[data-testid="stColumn"]:nth-child(2),
+div[class*="st-key-love_note_"] div[data-testid="stColumn"]:nth-child(3) {
+    display: flex;
+    align-items: flex-start;
 }
 
 /* 모바일 대응 */
@@ -1150,8 +1157,9 @@ def render_outfit_list(df: pd.DataFrame):
             st.rerun()
 
 
-def render_deletable_table(sheet_name: str, df: pd.DataFrame, sort_col: str = "날짜", transform=None):
-    """날짜 정렬 옵션과 함께 표를 보여주고, 행을 선택해서 삭제할 수 있게 합니다."""
+def render_deletable_table(sheet_name: str, df: pd.DataFrame, sort_col: str = "날짜", transform=None, on_edit=None):
+    """날짜 정렬 옵션과 함께 표를 보여주고, 행을 선택해서 수정하거나 삭제할 수 있게 합니다.
+    on_edit(원본_idx, row)를 넘기면, 행을 딱 하나만 선택했을 때 '✏️ 수정' 버튼도 같이 보여줘요."""
     order = st.selectbox(
         "정렬", ["최신순", "오래된순"], key=f"{sheet_name}_sort_order",
         label_visibility="collapsed",
@@ -1170,14 +1178,72 @@ def render_deletable_table(sheet_name: str, df: pd.DataFrame, sort_col: str = "�
     selected = list(event.selection.rows) if event and event.selection else []
     if selected:
         original_idx = display_df.iloc[selected].index.tolist()
-        if st.button(
-            f"🗑️ 선택한 {len(selected)}개 기록 삭제",
-            key=f"{sheet_name}_delete_btn",
-            use_container_width=True,
-        ):
-            storage.delete_rows(sheet_name, original_idx)
-            st.success("삭제했어요!")
-            st.rerun()
+        if on_edit and len(selected) == 1:
+            ec1, ec2 = st.columns(2, gap="small")
+            with ec1:
+                if st.button("✏️ 수정", key=f"{sheet_name}_edit_btn", use_container_width=True):
+                    on_edit(original_idx[0], df.loc[original_idx[0]])
+                    st.rerun()
+            with ec2:
+                if st.button("🗑️ 삭제", key=f"{sheet_name}_delete_btn", use_container_width=True):
+                    storage.delete_rows(sheet_name, original_idx)
+                    st.success("삭제했어요!")
+                    st.rerun()
+        else:
+            if st.button(
+                f"🗑️ 선택한 {len(selected)}개 기록 삭제",
+                key=f"{sheet_name}_delete_btn",
+                use_container_width=True,
+            ):
+                storage.delete_rows(sheet_name, original_idx)
+                st.success("삭제했어요!")
+                st.rerun()
+
+
+def _scroll_to_anchor(anchor_id: str):
+    """지정한 id를 가진 요소 위치로 부드럽게 스크롤합니다. 수정 버튼이 화면 아래쪽
+    표에 있어서, 눌렀을 때 위쪽 폼으로 자동 이동시켜 폼이 바뀐 걸 놓치지 않게 해요."""
+    components.html(
+        f"""
+        <script>
+        (function() {{
+            const doc = window.parent.document;
+            const el = doc.getElementById('{anchor_id}');
+            if (el) {{ el.scrollIntoView({{behavior: 'smooth', block: 'start'}}); }}
+        }})();
+        </script>
+        """,
+        height=0, width=0,
+    )
+
+
+def _start_record_edit(sheet: str, idx, pending: dict):
+    """표에서 특정 기록의 '✏️ 수정'을 누르면 그 값을 폼에 채워 넣고 수정 모드로
+    들어갑니다. 옷 기록 달력 수정과 같은 pending-state 패턴 - 폼 위젯이 이미 이번
+    스크립트 실행에서 만들어졌을 수 있어서, 값을 대기 상태에 저장해뒀다가 다음
+    렌더링에서 위젯이 만들어지기 *전에* 적용해요."""
+    st.session_state[f"_{sheet}_edit_pending"] = pending
+    st.session_state[f"{sheet}_edit_idx"] = idx
+    st.session_state[f"_scroll_to_{sheet}_form"] = True
+
+
+def _apply_pending_edit(sheet: str, anchor_id: str):
+    """탭 맨 위에서 호출 - 대기 중인 수정 값이 있으면 위젯 생성 전에 반영하고,
+    필요하면 폼 위치로 스크롤합니다."""
+    st.markdown(f'<div id="{anchor_id}"></div>', unsafe_allow_html=True)
+    pending = st.session_state.pop(f"_{sheet}_edit_pending", None)
+    if pending:
+        for k, v in pending.items():
+            st.session_state[k] = v
+    if st.session_state.pop(f"_scroll_to_{sheet}_form", False):
+        _scroll_to_anchor(anchor_id)
+
+
+def _clear_edit_state(sheet: str, widget_keys: list):
+    for k in widget_keys:
+        st.session_state.pop(k, None)
+    st.session_state.pop(f"{sheet}_edit_idx", None)
+    st.session_state.pop(f"_{sheet}_edit_pending", None)
 
 
 OUTFIT_COLS = [("상의", "👕"), ("하의", "👖"), ("가방", "👜"), ("양말", "🧦"), ("신발", "👟")]
@@ -1493,7 +1559,7 @@ def render_love_notes(df: pd.DataFrame):
     sorted_df = df.sort_values("날짜", ascending=(order == "오래된순"))
     for idx, row in sorted_df.iterrows():
         with st.container(border=True, key=f"love_note_{idx}"):
-            c1, c2 = st.columns([6, 1])
+            c1, c2, c3 = st.columns([7, 1, 1], vertical_alignment="top")
             with c1:
                 content = str(row.get("내용", "")).replace("<", "&lt;").replace(">", "&gt;")
                 st.markdown(
@@ -1502,6 +1568,14 @@ def render_love_notes(df: pd.DataFrame):
                     unsafe_allow_html=True,
                 )
             with c2:
+                if st.button("✏️", key=f"love_edit_{idx}"):
+                    d_val = pd.to_datetime(row.get("날짜"), errors="coerce")
+                    _start_record_edit("LoveNotes", idx, {
+                        "love_date": d_val.date() if pd.notna(d_val) else date.today(),
+                        "love_text": row.get("내용", "") or "",
+                    })
+                    st.rerun()
+            with c3:
                 if st.button("🗑️", key=f"love_delete_{idx}"):
                     storage.delete_rows("LoveNotes", [idx])
                     st.success("삭제했어요!")
@@ -1732,6 +1806,37 @@ with tab2:
     st.markdown('<p class="section-title">지금 기분은 어때요?</p>', unsafe_allow_html=True)
     st.caption("하루에 여러 번 기록할 수 있어요. 예: 출근할 때, 점심 먹고, 퇴근할 때")
 
+    _apply_pending_edit("Moods", "mood-top-anchor")
+    _mood_edit_idx = st.session_state.get("Moods_edit_idx")
+    _mood_edit_widgets = ["mood_date", "mood_time", "mood_score", "mood_memo"]
+
+    def _mood_on_edit(idx, row):
+        d_val = pd.to_datetime(row.get("날짜"), errors="coerce")
+        t_str = str(row.get("시간", "") or "").strip()
+        try:
+            t_val = datetime.strptime(t_str, "%H:%M").time()
+        except ValueError:
+            t_val = datetime.now().time().replace(second=0, microsecond=0)
+        try:
+            score_val = int(row.get("기분"))
+        except (TypeError, ValueError):
+            score_val = 3
+        _start_record_edit("Moods", idx, {
+            "mood_date": d_val.date() if pd.notna(d_val) else date.today(),
+            "mood_time": t_val,
+            "mood_score": score_val if score_val in (1, 2, 3, 4, 5) else 3,
+            "mood_memo": row.get("메모", "") or "",
+        })
+
+    if _mood_edit_idx is not None:
+        mc1, mc2 = st.columns([5, 1])
+        with mc1:
+            st.info("✏️ 이 기록을 수정하는 중이에요. 저장하면 기존 기록을 덮어써요.")
+        with mc2:
+            if st.button("취소", key="mood_edit_cancel", use_container_width=True):
+                _clear_edit_state("Moods", _mood_edit_widgets)
+                st.rerun()
+
     with st.expander("✏️ 기록하기", expanded=True, key="mood_form_exp"):
         with st.form("mood_form", clear_on_submit=False):
             c1, c2 = st.columns(2, gap="medium")
@@ -1751,20 +1856,27 @@ with tab2:
                 key="mood_score",
             )
             mood_memo = st.text_input("메모 (선택)", placeholder="예: 회의 많아서 힘들었음", key="mood_memo")
-            mood_submitted = st.form_submit_button("✏️ 기록하기", use_container_width=True, type="primary")
+            _mood_submit_label = "💾 수정 완료" if _mood_edit_idx is not None else "✏️ 기록하기"
+            mood_submitted = st.form_submit_button(_mood_submit_label, use_container_width=True, type="primary")
             if mood_submitted:
                 time_str = mood_time.strftime("%H:%M")
-                # 같은 날짜+시간에 이미 기록이 있으면 덮어씁니다 (그 외엔 하루에 여러 개 쌓여요).
-                existing_idx = df.index[
-                    (pd.to_datetime(df["날짜"], errors="coerce").dt.date == mood_date)
-                    & (df["시간"].astype(str) == time_str)
-                ].tolist() if not df.empty else []
-                if existing_idx:
-                    storage.delete_rows("Moods", existing_idx)
+                idx_to_delete = set()
+                if _mood_edit_idx is not None and _mood_edit_idx in df.index:
+                    idx_to_delete.add(_mood_edit_idx)
+                else:
+                    # 같은 날짜+시간에 이미 기록이 있으면 덮어씁니다 (그 외엔 하루에 여러 개 쌓여요).
+                    existing_idx = df.index[
+                        (pd.to_datetime(df["날짜"], errors="coerce").dt.date == mood_date)
+                        & (df["시간"].astype(str) == time_str)
+                    ].tolist() if not df.empty else []
+                    idx_to_delete.update(existing_idx)
+                if idx_to_delete:
+                    storage.delete_rows("Moods", list(idx_to_delete))
                 storage.append_row(
                     "Moods",
                     {"날짜": str(mood_date), "시간": time_str, "기분": mood_score, "메모": mood_memo},
                 )
+                _clear_edit_state("Moods", _mood_edit_widgets)
                 st.success("기록했어요!")
                 st.rerun()
 
@@ -1775,12 +1887,39 @@ with tab2:
         else:
             render_mood_calendar(df)
             st.write("")
-            render_deletable_table("Moods", df)
+            render_deletable_table("Moods", df, on_edit=_mood_on_edit)
 
 # ==================== 3. 책/영화 기록 ====================
 with tab3:
     df = storage.load_df("Media")
     st.markdown(f'<p class="section-title">책 / 영화 기록 · 총 {len(df)}개 기록</p>', unsafe_allow_html=True)
+
+    _apply_pending_edit("Media", "media-top-anchor")
+    _media_edit_idx = st.session_state.get("Media_edit_idx")
+    _media_edit_widgets = ["media_date", "media_kind", "media_title", "media_rating", "media_review"]
+
+    def _media_on_edit(idx, row):
+        d_val = pd.to_datetime(row.get("날짜"), errors="coerce")
+        try:
+            rating_val = int(float(row.get("별점", 3)))
+        except (TypeError, ValueError):
+            rating_val = 3
+        _start_record_edit("Media", idx, {
+            "media_date": d_val.date() if pd.notna(d_val) else date.today(),
+            "media_kind": row.get("종류", "책") if row.get("종류") in ("책", "영화") else "책",
+            "media_title": row.get("제목", "") or "",
+            "media_rating": min(max(rating_val, 1), 5),
+            "media_review": row.get("감상평", "") or "",
+        })
+
+    if _media_edit_idx is not None:
+        mc1, mc2 = st.columns([5, 1])
+        with mc1:
+            st.info("✏️ 이 기록을 수정하는 중이에요. 저장하면 기존 기록을 덮어써요.")
+        with mc2:
+            if st.button("취소", key="media_edit_cancel", use_container_width=True):
+                _clear_edit_state("Media", _media_edit_widgets)
+                st.rerun()
 
     with st.expander("✏️ 기록하기", expanded=True, key="media_form_exp"):
         with st.form("media_form", clear_on_submit=True):
@@ -1793,9 +1932,12 @@ with tab3:
                 title = st.text_input("제목", key="media_title")
             rating = st.slider("별점", 1, 5, 3, key="media_rating")
             review = st.text_area("감상평 (선택)", key="media_review")
-            submitted = st.form_submit_button("✏️ 기록하기", use_container_width=True, type="primary")
+            _media_submit_label = "💾 수정 완료" if _media_edit_idx is not None else "✏️ 기록하기"
+            submitted = st.form_submit_button(_media_submit_label, use_container_width=True, type="primary")
             if submitted:
                 if title.strip():
+                    if _media_edit_idx is not None and _media_edit_idx in df.index:
+                        storage.delete_rows("Media", [_media_edit_idx])
                     storage.append_row(
                         "Media",
                         {
@@ -1806,6 +1948,7 @@ with tab3:
                             "감상평": review,
                         },
                     )
+                    _clear_edit_state("Media", _media_edit_widgets)
                     st.success("기록했어요!")
                     st.rerun()
                 else:
@@ -1821,7 +1964,7 @@ with tab3:
             except Exception:
                 pass
             col3.metric("책 / 영화", f"{(df['종류']=='책').sum()} / {(df['종류']=='영화').sum()}")
-            render_deletable_table("Media", df)
+            render_deletable_table("Media", df, on_edit=_media_on_edit)
         else:
             st.caption("아직 기록이 없어요. 최근에 본 책이나 영화를 남겨보세요 🎬")
 
@@ -1830,25 +1973,55 @@ with tab4:
     df = storage.load_df("Expenses")
     st.markdown(f'<p class="section-title">가계부 · 총 {len(df)}건</p>', unsafe_allow_html=True)
 
+    _apply_pending_edit("Expenses", "expense-top-anchor")
+    _expense_edit_idx = st.session_state.get("Expenses_edit_idx")
+    _expense_edit_widgets = ["expense_date", "expense_cat", "expense_amount", "expense_memo"]
+    _EXPENSE_CATS = ["식비", "교통", "쇼핑", "문화생활", "고정비", "기타"]
+
+    def _expense_on_edit(idx, row):
+        d_val = pd.to_datetime(row.get("날짜"), errors="coerce")
+        try:
+            amount_val = int(float(row.get("금액", 0)))
+        except (TypeError, ValueError):
+            amount_val = 0
+        cat_val = row.get("카테고리", "기타")
+        _start_record_edit("Expenses", idx, {
+            "expense_date": d_val.date() if pd.notna(d_val) else date.today(),
+            "expense_cat": cat_val if cat_val in _EXPENSE_CATS else "기타",
+            "expense_amount": max(amount_val, 0),
+            "expense_memo": row.get("메모", "") or "",
+        })
+
+    if _expense_edit_idx is not None:
+        mc1, mc2 = st.columns([5, 1])
+        with mc1:
+            st.info("✏️ 이 기록을 수정하는 중이에요. 저장하면 기존 기록을 덮어써요.")
+        with mc2:
+            if st.button("취소", key="expense_edit_cancel", use_container_width=True):
+                _clear_edit_state("Expenses", _expense_edit_widgets)
+                st.rerun()
+
     with st.expander("✏️ 기록하기", expanded=True, key="expense_form_exp"):
         with st.form("expense_form", clear_on_submit=True):
             c1, c2, c3 = st.columns([1, 1, 1], gap="medium")
             with c1:
                 d = st.date_input("날짜", value=date.today(), key="expense_date")
             with c2:
-                category = st.selectbox(
-                    "카테고리", ["식비", "교통", "쇼핑", "문화생활", "고정비", "기타"], key="expense_cat"
-                )
+                category = st.selectbox("카테고리", _EXPENSE_CATS, key="expense_cat")
             with c3:
                 amount = st.number_input("금액", min_value=0, step=1000, key="expense_amount")
             memo = st.text_input("메모 (선택)", key="expense_memo")
-            submitted = st.form_submit_button("✏️ 기록하기", use_container_width=True, type="primary")
+            _expense_submit_label = "💾 수정 완료" if _expense_edit_idx is not None else "✏️ 기록하기"
+            submitted = st.form_submit_button(_expense_submit_label, use_container_width=True, type="primary")
             if submitted:
                 if amount > 0:
+                    if _expense_edit_idx is not None and _expense_edit_idx in df.index:
+                        storage.delete_rows("Expenses", [_expense_edit_idx])
                     storage.append_row(
                         "Expenses",
                         {"날짜": str(d), "카테고리": category, "금액": amount, "메모": memo},
                     )
+                    _clear_edit_state("Expenses", _expense_edit_widgets)
                     st.success("기록했어요!")
                     st.rerun()
                 else:
@@ -1863,7 +2036,7 @@ with tab4:
             col2.metric("이번 기록 건수", len(df))
             chart_df = df.groupby("카테고리")["금액"].sum()
             st.bar_chart(chart_df, color="#2DD4BF")
-            render_deletable_table("Expenses", df)
+            render_deletable_table("Expenses", df, on_edit=_expense_on_edit)
         else:
             st.caption("아직 기록이 없어요. 오늘 쓴 돈을 남겨보세요 💸")
 
@@ -1872,6 +2045,27 @@ with tab5:
     df = storage.load_df("Habits")
     habit_count = df["습관"].dropna().nunique() if not df.empty else 0
     st.markdown(f'<p class="section-title">습관 트래커 · {habit_count}개 습관 관리 중</p>', unsafe_allow_html=True)
+
+    _apply_pending_edit("Habits", "habit-top-anchor")
+    _habit_edit_idx = st.session_state.get("Habits_edit_idx")
+    _habit_edit_widgets = ["habit_date", "habit_name", "habit_done"]
+
+    def _habit_on_edit(idx, row):
+        d_val = pd.to_datetime(row.get("날짜"), errors="coerce")
+        _start_record_edit("Habits", idx, {
+            "habit_date": d_val.date() if pd.notna(d_val) else date.today(),
+            "habit_name": row.get("습관", "") or "",
+            "habit_done": str(row.get("완료", "")).strip().lower() in ("true", "1"),
+        })
+
+    if _habit_edit_idx is not None:
+        mc1, mc2 = st.columns([5, 1])
+        with mc1:
+            st.info("✏️ 이 기록을 수정하는 중이에요. 저장하면 기존 기록을 덮어써요.")
+        with mc2:
+            if st.button("취소", key="habit_edit_cancel", use_container_width=True):
+                _clear_edit_state("Habits", _habit_edit_widgets)
+                st.rerun()
 
     with st.expander("✏️ 기록하기", expanded=True, key="habit_form_exp"):
         with st.form("habit_form", clear_on_submit=True):
@@ -1882,12 +2076,16 @@ with tab5:
                 habit = st.text_input("습관 이름", placeholder="예: 물 마시기, 운동, 독서", key="habit_name")
             with c3:
                 done = st.checkbox("완료했어요", value=True, key="habit_done")
-            submitted = st.form_submit_button("✏️ 기록하기", use_container_width=True, type="primary")
+            _habit_submit_label = "💾 수정 완료" if _habit_edit_idx is not None else "✏️ 기록하기"
+            submitted = st.form_submit_button(_habit_submit_label, use_container_width=True, type="primary")
             if submitted:
                 if habit.strip():
+                    if _habit_edit_idx is not None and _habit_edit_idx in df.index:
+                        storage.delete_rows("Habits", [_habit_edit_idx])
                     storage.append_row(
                         "Habits", {"날짜": str(d), "습관": habit, "완료": done}
                     )
+                    _clear_edit_state("Habits", _habit_edit_widgets)
                     st.success("기록했어요!")
                     st.rerun()
                 else:
@@ -1910,7 +2108,7 @@ with tab5:
                         cur -= timedelta(days=1)
                     with cols[i]:
                         st.metric(h, f"🔥 {streak}일 연속")
-            render_deletable_table("Habits", df)
+            render_deletable_table("Habits", df, on_edit=_habit_on_edit)
         else:
             st.caption("아직 기록이 없어요. 오늘부터 만들고 싶은 습관을 기록해보세요 💪")
 
@@ -1918,6 +2116,19 @@ with tab5:
 with tab6:
     df = storage.load_df("LoveNotes")
     st.markdown(f'<p class="section-title">남편에게 전하는 마음 · 총 {len(df)}개</p>', unsafe_allow_html=True)
+
+    _apply_pending_edit("LoveNotes", "love-top-anchor")
+    _love_edit_idx = st.session_state.get("LoveNotes_edit_idx")
+    _love_edit_widgets = ["love_date", "love_text"]
+
+    if _love_edit_idx is not None:
+        mc1, mc2 = st.columns([5, 1])
+        with mc1:
+            st.info("✏️ 이 기록을 수정하는 중이에요. 저장하면 기존 기록을 덮어써요.")
+        with mc2:
+            if st.button("취소", key="love_edit_cancel", use_container_width=True):
+                _clear_edit_state("LoveNotes", _love_edit_widgets)
+                st.rerun()
 
     with st.expander("✏️ 기록하기", expanded=True, key="love_form_exp"):
         with st.form("love_form", clear_on_submit=True):
@@ -1927,10 +2138,14 @@ with tab6:
                 placeholder="예: 오늘 아침에 커피 타준 거 너무 고마웠어. 사랑해 ❤️",
                 key="love_text", height=100,
             )
-            love_submitted = st.form_submit_button("💌 마음 전하기", use_container_width=True, type="primary")
+            _love_submit_label = "💾 수정 완료" if _love_edit_idx is not None else "💌 마음 전하기"
+            love_submitted = st.form_submit_button(_love_submit_label, use_container_width=True, type="primary")
             if love_submitted:
                 if love_text.strip():
+                    if _love_edit_idx is not None and _love_edit_idx in df.index:
+                        storage.delete_rows("LoveNotes", [_love_edit_idx])
                     storage.append_row("LoveNotes", {"날짜": str(love_date), "내용": love_text})
+                    _clear_edit_state("LoveNotes", _love_edit_widgets)
                     st.success("기록했어요! 오늘도 사랑이 +1 됐어요 💕")
                     st.rerun()
                 else:
