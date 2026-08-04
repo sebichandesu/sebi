@@ -231,8 +231,9 @@ button[data-testid*="primary"]:active {
     transform: translateY(-2px) scale(1.02);
 }
 
-/* 달력 이동(◀▶) - 미니멀 고스트 버튼 */
-.st-key-outfit_cal_prev button, .st-key-outfit_cal_next button {
+/* 달력 이동(◀▶) - 미니멀 고스트 버튼 (옷 기록 달력 + 기분 기록 달력 공통) */
+.st-key-outfit_cal_prev button, .st-key-outfit_cal_next button,
+.st-key-mood_cal_prev button, .st-key-mood_cal_next button {
     background-color: transparent !important;
     color: var(--text-sub) !important;
     border: 1.5px solid var(--border) !important;
@@ -240,12 +241,22 @@ button[data-testid*="primary"]:active {
     border-radius: 10px;
     padding: 0.45rem 0.9rem;
 }
-.st-key-outfit_cal_prev button:hover, .st-key-outfit_cal_next button:hover {
+.st-key-outfit_cal_prev button:hover, .st-key-outfit_cal_next button:hover,
+.st-key-mood_cal_prev button:hover, .st-key-mood_cal_next button:hover {
     color: var(--accent) !important;
     border-color: var(--accent) !important;
     background-color: var(--accent-soft) !important;
     box-shadow: none !important;
     transform: translateY(-1px);
+}
+/* 모바일에서는 더 작고 아담하게 */
+@media (max-width: 640px) {
+    .st-key-outfit_cal_prev button, .st-key-outfit_cal_next button,
+    .st-key-mood_cal_prev button, .st-key-mood_cal_next button {
+        padding: 0.3rem 0.5rem !important;
+        font-size: 0.8rem !important;
+        min-height: 0 !important;
+    }
 }
 
 /* 달력 날짜 셀(클릭 가능) */
