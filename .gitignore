@@ -1,0 +1,13 @@
+# 절대 커밋하면 안 되는 민감 파일들
+.streamlit/secrets.toml
+client_secret.json
+authorized_user.json
+
+# 로컬 테스트/임시 파일
+data/
+__pycache__/
+*.pyc
+*.log
+
+# OS/편집기 잡파일
+.DS_Store

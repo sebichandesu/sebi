@@ -1,10 +1,11 @@
 import calendar as cal_module
+import html
+import json
 
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
-import requests
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 
 import storage
 
@@ -145,8 +146,21 @@ div[data-testid="stForm"] {
     margin-bottom: 2rem;
 }
 div[data-testid="stForm"] label p {
-    font-weight: 500;
-    font-size: 0.88rem;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: var(--text-sub);
+}
+.st-key-outfit_form_card {
+    background-color: var(--surface);
+    border: 1px solid var(--border) !important;
+    border-radius: 16px !important;
+    padding: 1.7rem 1.8rem 1rem 1.8rem !important;
+    box-shadow: 0 2px 16px rgba(20, 184, 166, 0.07);
+    margin-bottom: 2rem;
+}
+.st-key-outfit_form_card label p {
+    font-weight: 600;
+    font-size: 0.8rem;
     color: var(--text-sub);
 }
 
@@ -233,6 +247,51 @@ button[data-testid*="primary"]:active {
     transform: translateY(-1px);
 }
 
+/* 달력 날짜 셀(클릭 가능) */
+div[class*="st-key-outfit_cal_day_"] button {
+    background-color: var(--surface) !important;
+    color: var(--text-main) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+    min-height: 58px;
+    padding: 0.45rem 0.2rem 0.7rem 0.2rem !important;
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    transform: none !important;
+}
+div[class*="st-key-outfit_cal_day_"] button:hover {
+    background-color: var(--accent-soft) !important;
+    border-color: var(--accent) !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+div[class*="st-key-outfit_cal_day_"] button:active {
+    background-color: var(--accent-soft) !important;
+    transform: scale(0.95) !important;
+}
+div[class*="__dim"] button {
+    opacity: 0.32;
+}
+div[class*="__today"] button {
+    border: 2px solid var(--accent) !important;
+    font-weight: 700 !important;
+}
+/* 날짜 버튼 + 아래 색상 점(dots)이 한 칸처럼 붙어 보이도록 그 칸의 세로 간격만 좁힘 */
+div[data-testid="stVerticalBlock"]:has(> div[class*="st-key-outfit_cal_day_"]) {
+    gap: 0.25rem !important;
+}
+/* 달력 그리드 전체(주 단위 행들) 간격도 좁혀서 촘촘한 달력처럼 보이게 */
+div[class*="st-key-outfit_cal_grid"] div[data-testid="stVerticalBlock"] {
+    gap: 0.4rem !important;
+}
+.cal-dots {
+    min-height: 12px;
+}
+
 /* 메트릭 카드 */
 div[data-testid="stMetric"] {
     background-color: var(--surface);
@@ -297,6 +356,19 @@ div[data-baseweb="base-input"]:focus-within {
     border-radius: 10px !important;
 }
 
+/* 글자 크기 위계: 라벨(0.8rem, 회색)보다 선택된 값/입력한 글씨가 오히려 커 보이던 문제
+   (셀렉트박스는 브라우저 기본 크기를 그대로 쓰고 있었음) - 값 글씨 크기를 명시적으로
+   지정해서 라벨과 자연스럽게 어울리도록 맞춤. 팝업으로 뜨는 드롭다운 옵션 목록도 동일 크기로. */
+div[data-baseweb="select"], div[data-baseweb="select"] *,
+div[data-baseweb="input"] input, div[data-baseweb="input"] *,
+div[data-baseweb="popover"] li, div[data-baseweb="popover"] *,
+ul[role="listbox"], ul[role="listbox"] * {
+    font-size: 0.85rem !important;
+}
+div[data-baseweb="select"] input {
+    font-size: 0.85rem !important;
+}
+
 /* 데이터프레임 */
 div[data-testid="stDataFrame"] {
     border-radius: 14px;
@@ -315,6 +387,52 @@ div[data-testid="stDataFrame"] {
     font-weight: 600;
     margin: 3px 6px 3px 0;
     box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+/* 기분 잔디밭 히트맵 */
+.mood-grid-wrap {
+    overflow-x: auto;
+    padding-bottom: 4px;
+    margin-top: 0.6rem;
+}
+.mood-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(7, 1fr);
+    gap: 3px;
+    width: fit-content;
+}
+.mood-cell {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+}
+.mood-cell-hasdata {
+    cursor: pointer;
+}
+.mood-cell-hasdata:hover {
+    transform: scale(1.25);
+    box-shadow: 0 0 0 1.5px var(--accent);
+}
+.mood-cell-future {
+    background: transparent;
+    border: none;
+}
+.mood-legend {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.72rem;
+    color: var(--text-sub);
+    margin: 0.5rem 0 1rem 0;
+}
+.mood-legend-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 3px;
+    display: inline-block;
+    margin: 0 1px;
 }
 
 /* 달력 뷰 */
@@ -372,6 +490,37 @@ div[data-testid="stDataFrame"] {
     font-size: 1rem;
     margin: 0.3rem 0;
     color: var(--text-main);
+}
+
+/* 사랑 고백 카드 */
+div[class*="st-key-love_note_"] {
+    background-color: #FFF7FA !important;
+    border: 1px solid #FBCFE8 !important;
+    border-radius: 14px !important;
+    box-shadow: 0 2px 8px rgba(225, 29, 109, 0.06);
+}
+.love-note-date {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #E11D6D;
+}
+.love-note-text {
+    margin: 0.35rem 0 0 0;
+    font-size: 0.92rem;
+    line-height: 1.55;
+    color: var(--text-main);
+    white-space: pre-wrap;
+}
+div[class*="st-key-love_delete_"] button {
+    background-color: transparent !important;
+    color: #E11D6D !important;
+    border: 1.5px solid #FBCFE8 !important;
+    box-shadow: none !important;
+    padding: 0.4rem 0.6rem !important;
+}
+div[class*="st-key-love_delete_"] button:hover {
+    background-color: #FFF1F5 !important;
+    border-color: #E11D6D !important;
 }
 
 /* 모바일 대응 */
@@ -495,6 +644,275 @@ STAR_TRAIL_JS = """
 </script>
 """
 components.html(STAR_TRAIL_JS, height=0, width=0)
+
+
+# ==================== 배경음악(BGM) 플레이어 ====================
+# 저작권 걱정 없이 쓸 수 있는 무료 데모 트랙(SoundHelix)으로 구성한 플레이리스트.
+BGM_PLAYLIST = [
+    {"name": "잔잔한 아침", "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"},
+    {"name": "말랑말랑 오후", "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"},
+    {"name": "다이어리 타임", "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"},
+    {"name": "느긋한 하루", "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"},
+    {"name": "포근한 밤", "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3"},
+]
+
+BGM_PLAYER_JS = f"""
+<script>
+(function() {{
+    const doc = window.parent.document;
+    if (doc.__bgmPlayerInit) return;
+    doc.__bgmPlayerInit = true;
+
+    const playlist = {json.dumps(BGM_PLAYLIST, ensure_ascii=False)};
+    let idx = 0;
+
+    const style = doc.createElement('style');
+    style.textContent = `
+        #mallang-bgm-wrap {{
+            position: fixed; right: 20px; bottom: 20px; z-index: 999998;
+            font-family: 'Pretendard','Malgun Gothic',-apple-system,sans-serif;
+        }}
+        #mallang-bgm-toggle {{
+            width: 46px; height: 46px; border-radius: 50%; border: none; cursor: pointer;
+            background: linear-gradient(135deg, #2DD4BF 0%, #38BDF8 100%);
+            color: #fff; font-size: 19px; box-shadow: 0 6px 16px rgba(45,212,191,0.4);
+            display: flex; align-items: center; justify-content: center;
+            transition: transform 0.15s ease;
+        }}
+        #mallang-bgm-toggle:hover {{ transform: scale(1.08); }}
+        #mallang-bgm-toggle.playing {{ animation: mallang-bgm-pulse 1.2s ease-in-out infinite; }}
+        @keyframes mallang-bgm-pulse {{
+            0%, 100% {{ box-shadow: 0 6px 16px rgba(45,212,191,0.4), 0 0 0 0 rgba(45,212,191,0.3); }}
+            50% {{ box-shadow: 0 6px 16px rgba(45,212,191,0.4), 0 0 0 8px rgba(45,212,191,0); }}
+        }}
+        #mallang-bgm-panel {{
+            position: absolute; bottom: 58px; right: 0; width: 230px;
+            background: #fff; border: 1px solid #DCEEEC; border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.16); padding: 14px;
+            display: none;
+        }}
+        #mallang-bgm-panel.open {{ display: block; }}
+        #mallang-bgm-title {{ font-size: 0.78rem; font-weight: 700; color: #6B8C89; margin-bottom: 2px; }}
+        #mallang-bgm-track {{ font-size: 0.85rem; font-weight: 700; color: #1C2B2A; margin-bottom: 10px; }}
+        .mallang-bgm-controls {{ display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; }}
+        .mallang-bgm-controls button {{
+            width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid #DCEEEC; background: #fff;
+            cursor: pointer; font-size: 13px; color: #1C2B2A; display: flex; align-items: center; justify-content: center;
+        }}
+        .mallang-bgm-controls button:hover {{ background: #E7FBF8; border-color: #2DD4BF; }}
+        #mallang-bgm-play {{
+            width: 42px; height: 42px; background: #2DD4BF; color: #fff; border-color: #2DD4BF; font-size: 15px;
+        }}
+        #mallang-bgm-play:hover {{ background: #26bfab; }}
+        #mallang-bgm-vol-row {{ display: flex; align-items: center; gap: 6px; font-size: 12px; color: #6B8C89; }}
+        #mallang-bgm-vol {{ width: 100%; accent-color: #2DD4BF; cursor: pointer; }}
+    `;
+    doc.head.appendChild(style);
+
+    const wrap = doc.createElement('div');
+    wrap.id = 'mallang-bgm-wrap';
+    wrap.innerHTML = `
+        <div id="mallang-bgm-panel">
+            <div id="mallang-bgm-title">🎵 배경음악</div>
+            <div id="mallang-bgm-track"></div>
+            <div class="mallang-bgm-controls">
+                <button id="mallang-bgm-prev" title="이전 곡">⏮</button>
+                <button id="mallang-bgm-play" title="재생/일시정지">▶️</button>
+                <button id="mallang-bgm-next" title="다음 곡">⏭</button>
+            </div>
+            <div id="mallang-bgm-vol-row">
+                🔈 <input type="range" id="mallang-bgm-vol" min="0" max="100" value="45" />
+            </div>
+        </div>
+        <button id="mallang-bgm-toggle" title="음악">🎵</button>
+    `;
+    doc.body.appendChild(wrap);
+
+    const audio = doc.createElement('audio');
+    audio.id = 'mallang-bgm-audio';
+    audio.preload = 'none';
+    doc.body.appendChild(audio);
+    audio.volume = 0.45;
+
+    const toggleBtn = wrap.querySelector('#mallang-bgm-toggle');
+    const panel = wrap.querySelector('#mallang-bgm-panel');
+    const trackLabel = wrap.querySelector('#mallang-bgm-track');
+    const playBtn = wrap.querySelector('#mallang-bgm-play');
+    const prevBtn = wrap.querySelector('#mallang-bgm-prev');
+    const nextBtn = wrap.querySelector('#mallang-bgm-next');
+    const volInput = wrap.querySelector('#mallang-bgm-vol');
+
+    function loadTrack(i, autoplay) {{
+        idx = (i + playlist.length) % playlist.length;
+        audio.src = playlist[idx].url;
+        trackLabel.textContent = (idx + 1) + '. ' + playlist[idx].name;
+        if (autoplay) {{ audio.play().catch(function() {{}}); }}
+    }}
+
+    function updatePlayBtn() {{
+        playBtn.textContent = audio.paused ? '▶️' : '⏸️';
+        toggleBtn.classList.toggle('playing', !audio.paused);
+    }}
+
+    toggleBtn.addEventListener('click', function() {{
+        panel.classList.toggle('open');
+    }});
+    doc.addEventListener('click', function(e) {{
+        if (!wrap.contains(e.target)) panel.classList.remove('open');
+    }});
+    playBtn.addEventListener('click', function() {{
+        if (!audio.src) loadTrack(0, false);
+        if (audio.paused) {{ audio.play().catch(function() {{}}); }} else {{ audio.pause(); }}
+    }});
+    prevBtn.addEventListener('click', function() {{ loadTrack(idx - 1, true); }});
+    nextBtn.addEventListener('click', function() {{ loadTrack(idx + 1, true); }});
+    audio.addEventListener('ended', function() {{ loadTrack(idx + 1, true); }});
+    audio.addEventListener('play', updatePlayBtn);
+    audio.addEventListener('pause', updatePlayBtn);
+    volInput.addEventListener('input', function() {{ audio.volume = volInput.value / 100; }});
+
+    loadTrack(0, false);
+    updatePlayBtn();
+}})();
+</script>
+"""
+components.html(BGM_PLAYER_JS, height=0, width=0)
+
+
+# ==================== 기분 잔디밭 클릭 상세보기 ====================
+# 잔디밭 칸(.mood-cell-hasdata)을 클릭하면 그날 몇 시에 어떤 기분을 남겼는지
+# 작은 팝업으로 보여줍니다. Streamlit 리런 없이 이미 렌더링된 data-detail(JSON)만
+# 읽어서 보여주는 방식이라 빠르고, 매 리런마다 다시 주입돼도 한 번만 초기화됩니다.
+MOOD_DETAIL_JS = """
+<script>
+(function() {
+    const doc = window.parent.document;
+    if (doc.__moodDetailInit) return;
+    doc.__moodDetailInit = true;
+
+    const style = doc.createElement('style');
+    style.textContent = `
+        #mallang-mood-popup {
+            position: fixed; width: 260px; max-height: 320px; overflow-y: auto;
+            background: #fff; border: 1px solid #DCEEEC; border-radius: 16px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.18); padding: 16px; padding-top: 30px;
+            z-index: 999997; display: none; opacity: 0; transition: opacity 0.12s ease;
+        }
+        #mallang-mood-popup.open { display: block; opacity: 1; }
+        #mallang-mood-popup::after {
+            content: ''; position: absolute; width: 12px; height: 12px; background: #fff;
+            border: 1px solid #DCEEEC; left: var(--arrow-left, 124px); margin-left: -6px;
+        }
+        #mallang-mood-popup.arrow-bottom::after {
+            bottom: -7px; border-top: none; border-left: none;
+            transform: rotate(45deg);
+        }
+        #mallang-mood-popup.arrow-top::after {
+            top: -7px; border-bottom: none; border-right: none;
+            transform: rotate(45deg);
+        }
+        #mallang-mood-popup-date {
+            font-size: 0.85rem; font-weight: 700; color: #1C2B2A; margin-bottom: 8px;
+            font-family: 'Pretendard','Malgun Gothic',-apple-system,sans-serif;
+        }
+        #mallang-mood-popup-close {
+            position: absolute; top: 8px; right: 10px; border: none; background: none; cursor: pointer;
+            font-size: 14px; color: #6B8C89; padding: 4px;
+        }
+        .mallang-mood-entry {
+            padding: 7px 0; border-top: 1px solid #E7FBF8; font-size: 0.8rem; color: #1C2B2A;
+            font-family: 'Pretendard','Malgun Gothic',-apple-system,sans-serif;
+        }
+        .mallang-mood-entry:first-of-type { border-top: none; }
+        .mallang-mood-entry .t { font-weight: 700; color: #6B8C89; margin-right: 6px; }
+        .mallang-mood-entry .memo { color: #6B8C89; margin-top: 2px; }
+        #mallang-mood-popup-empty {
+            font-size: 0.8rem; color: #6B8C89;
+            font-family: 'Pretendard','Malgun Gothic',-apple-system,sans-serif;
+        }
+    `;
+    doc.head.appendChild(style);
+
+    const popup = doc.createElement('div');
+    popup.id = 'mallang-mood-popup';
+    popup.innerHTML =
+        '<button id="mallang-mood-popup-close">\\u2715</button>' +
+        '<div id="mallang-mood-popup-date"></div>' +
+        '<div id="mallang-mood-popup-body"></div>';
+    doc.body.appendChild(popup);
+
+    const dateEl = popup.querySelector('#mallang-mood-popup-date');
+    const bodyEl = popup.querySelector('#mallang-mood-popup-body');
+    let activeCell = null;
+
+    popup.querySelector('#mallang-mood-popup-close').addEventListener('click', function() {
+        popup.classList.remove('open');
+        activeCell = null;
+    });
+
+    function positionNear(cell) {
+        const rect = cell.getBoundingClientRect();
+        const margin = 10;
+        popup.classList.remove('arrow-top', 'arrow-bottom');
+        popup.style.left = '-9999px';
+        popup.style.top = '-9999px';
+        popup.classList.add('open');
+        const pw = popup.offsetWidth;
+        const ph = popup.offsetHeight;
+
+        let left = rect.left + rect.width / 2 - pw / 2;
+        left = Math.max(margin, Math.min(left, doc.documentElement.clientWidth - pw - margin));
+
+        let top = rect.top - ph - margin;
+        let arrowClass = 'arrow-bottom'; // 팝업이 칸 위에 있으면, 화살표는 팝업 아래쪽(칸을 가리킴)
+        if (top < margin) {
+            top = rect.bottom + margin;
+            arrowClass = 'arrow-top'; // 위쪽에 자리가 없으면 칸 아래로, 화살표는 팝업 위쪽
+        }
+        top = Math.max(margin, Math.min(top, doc.documentElement.clientHeight - ph - margin));
+
+        popup.style.left = left + 'px';
+        popup.style.top = top + 'px';
+        popup.classList.add(arrowClass);
+
+        // 화살표는 항상 클릭한 칸 쪽을 가리키도록, 팝업 기준 x위치를 다시 맞춤
+        const arrowLeft = Math.max(14, Math.min(rect.left + rect.width / 2 - left, pw - 14));
+        popup.style.setProperty('--arrow-left', arrowLeft + 'px');
+    }
+
+    doc.addEventListener('click', function(e) {
+        const cell = e.target.closest && e.target.closest('.mood-cell-hasdata');
+        if (cell) {
+            if (activeCell === cell && popup.classList.contains('open')) {
+                // 같은 칸을 다시 클릭하면 닫기
+                popup.classList.remove('open');
+                activeCell = null;
+                return;
+            }
+            let data;
+            try { data = JSON.parse(cell.getAttribute('data-detail')); } catch (err) { return; }
+            dateEl.textContent = data.date + (data.avg ? ' \\u00b7 ' + data.avg : '');
+            if (data.entries && data.entries.length) {
+                bodyEl.innerHTML = data.entries.map(function(en) {
+                    return '<div class="mallang-mood-entry"><span class="t">' + en.time + '</span>' + en.label +
+                        (en.memo ? '<div class="memo">' + en.memo + '</div>' : '') + '</div>';
+                }).join('');
+            } else {
+                bodyEl.innerHTML = '<div id="mallang-mood-popup-empty">기록이 없어요.</div>';
+            }
+            positionNear(cell);
+            activeCell = cell;
+            return;
+        }
+        if (!popup.contains(e.target)) {
+            popup.classList.remove('open');
+            activeCell = null;
+        }
+    });
+})();
+</script>
+"""
+components.html(MOOD_DETAIL_JS, height=0, width=0)
 
 
 # ==================== 옷 색상 팔레트 ====================
@@ -633,6 +1051,28 @@ def render_deletable_table(sheet_name: str, df: pd.DataFrame, sort_col: str = "�
 
 
 OUTFIT_COLS = [("상의", "👕"), ("하의", "👖"), ("가방", "👜"), ("양말", "🧦"), ("신발", "👟")]
+OUTFIT_KEY_SUFFIX = {"상의": "top", "하의": "bottom", "가방": "bag", "양말": "socks", "신발": "shoes"}
+
+
+def _start_outfit_edit(picked_date, row):
+    """달력/목록에서 특정 날짜를 수정 모드로 진입시킵니다.
+
+    폼 위젯(outfit_date 등)은 이 함수가 호출되는 시점(달력 버튼 클릭 처리)에는
+    이미 이번 스크립트 실행에서 인스턴스화되어 있어서, 그 키를 바로 덮어쓰면
+    "widget already instantiated" 오류가 납니다. 그래서 값을 별도의 대기(pending)
+    상태에 저장해두고, 다음 렌더링에서 폼 위젯이 만들어지기 *전에* 적용합니다.
+    """
+    pending = {"outfit_date": picked_date}
+    for col, _icon in OUTFIT_COLS:
+        suffix = OUTFIT_KEY_SUFFIX[col]
+        val = row.get(col, "")
+        pending[f"outfit_{suffix}"] = val if val else None
+        color_val = row.get(f"{col}색상", "")
+        pending[f"outfit_{suffix}_color"] = color_val if color_val else None
+    pending["outfit_memo"] = row.get("메모", "") or ""
+    st.session_state["_outfit_edit_pending"] = pending
+    st.session_state["outfit_edit_date"] = picked_date
+    st.session_state["_scroll_to_outfit_form"] = True
 
 
 def _merge_day_rows(rows) -> dict:
@@ -690,40 +1130,69 @@ def render_outfit_calendar(df: pd.DataFrame):
     weekday_labels = ["일", "월", "화", "수", "목", "금", "토"]
     today = date.today()
 
-    grid_html = '<div class="cal-grid">'
-    for wd in weekday_labels:
-        grid_html += f'<div class="cal-weekday">{wd}</div>'
-    for week in weeks:
-        for d in week:
-            in_month = d.month == month
-            is_today = d == today
-            cls = "cal-cell"
-            if not in_month:
-                cls += " cal-cell-dim"
-            if is_today:
-                cls += " cal-cell-today"
-            dots = ""
-            if d in day_records:
-                rec = _merge_day_rows(day_records[d])
-                for col, _icon in OUTFIT_COLS:
-                    val = rec.get(col, "")
-                    if val:
-                        hexcode, _ = _color_hex(rec.get(f"{col}색상", ""))
-                        dots += f'<span class="cal-dot" style="background:{hexcode};" title="{col}: {val}"></span>'
-            grid_html += f'<div class="{cls}"><span class="cal-daynum">{d.day}</span><div class="cal-dots">{dots}</div></div>'
-    grid_html += "</div>"
-    st.markdown(grid_html, unsafe_allow_html=True)
+    picked = st.session_state.get("outfit_cal_detail_pick")
+    if picked is not None and (picked.year != year or picked.month != month):
+        picked = None
+
+    dot_styles = []
+    with st.container(key="outfit_cal_grid"):
+        header_cols = st.columns(7, gap="small")
+        for hcol, wd in zip(header_cols, weekday_labels):
+            hcol.markdown(f'<div class="cal-weekday">{wd}</div>', unsafe_allow_html=True)
+
+        for week in weeks:
+            wcols = st.columns(7, gap="small")
+            for wcol, d in zip(wcols, week):
+                in_month = d.month == month
+                is_today = d == today
+                marker = "__today" if is_today else ("__dim" if not in_month else "__norm")
+                btn_key = f"outfit_cal_day_{d.isoformat()}{marker}"
+
+                btn_label = str(d.day)
+                help_text = None
+                if d in day_records:
+                    rec = _merge_day_rows(day_records[d])
+                    worn = [(col, rec.get(col, "")) for col, _icon in OUTFIT_COLS if rec.get(col, "")]
+                    if worn:
+                        help_text = " · ".join(f"{col} {val}" for col, val in worn)
+                        n = len(worn)
+                        gradients = []
+                        for i, (col, val) in enumerate(worn):
+                            hexcode, _ = _color_hex(rec.get(f"{col}색상", ""))
+                            x = 50 + (i - (n - 1) / 2) * 16
+                            gradients.append(
+                                f"radial-gradient(circle at {x:.0f}% 84%, {hexcode} 3px, transparent 3.5px)"
+                            )
+                        dot_styles.append(
+                            f'div[class*="st-key-{btn_key}"] button {{'
+                            f"background-image: {', '.join(gradients)};"
+                            f"background-repeat: no-repeat; }}"
+                        )
+
+                with wcol:
+                    if st.button(
+                        btn_label, key=btn_key,
+                        use_container_width=True, help=help_text,
+                    ):
+                        st.session_state["outfit_cal_detail_pick"] = d
+                        st.rerun()
+
+    if dot_styles:
+        st.markdown(f"<style>{''.join(dot_styles)}</style>", unsafe_allow_html=True)
 
     month_dates = sorted(
         [d for d in day_records if d.year == year and d.month == month], reverse=True
     )
-    if month_dates:
-        picked = st.selectbox(
-            "상세히 볼 날짜",
-            options=month_dates,
-            format_func=lambda d: d.strftime("%Y-%m-%d (%a)"),
-            key="outfit_cal_detail_pick",
-        )
+    if picked is None and month_dates:
+        picked = month_dates[0]
+
+    st.write("")
+    if picked is None:
+        st.caption("이 달엔 기록이 없어요. 날짜를 클릭하면 자세히 볼 수 있어요.")
+    elif picked not in day_records:
+        st.caption(f"📅 {picked.strftime('%Y-%m-%d (%a)')} · 이 날짜엔 기록이 없어요.")
+    else:
+        st.caption(f"📌 {picked.strftime('%Y-%m-%d (%a)')} · 달력에서 다른 날짜를 클릭하면 바뀌어요.")
         row = _merge_day_rows(day_records[picked])
         tags_html = "".join(
             _outfit_tag(icon, row.get(col, ""), row.get(f"{col}색상", ""))
@@ -738,12 +1207,147 @@ def render_outfit_calendar(df: pd.DataFrame):
         original_positions = df.index[
             pd.to_datetime(df["날짜"], errors="coerce").dt.date == picked
         ].tolist()
-        if st.button("🗑️ 이 날 기록 삭제", key="outfit_cal_delete_btn"):
-            storage.delete_rows("Outfits", original_positions)
-            st.success("삭제했어요!")
-            st.rerun()
-    else:
-        st.caption("이 달엔 기록이 없어요.")
+        bcol1, bcol2 = st.columns(2, gap="small")
+        with bcol1:
+            if st.button("✏️ 이 날짜 수정", key="outfit_cal_edit_btn", use_container_width=True):
+                _start_outfit_edit(picked, row)
+                st.rerun()
+        with bcol2:
+            if st.button("🗑️ 이 날 기록 삭제", key="outfit_cal_delete_btn", use_container_width=True):
+                storage.delete_rows("Outfits", original_positions)
+                st.session_state.pop("outfit_cal_detail_pick", None)
+                st.success("삭제했어요!")
+                st.rerun()
+
+
+# ==================== 기분 기록 (잔디밭 스타일 히트맵) ====================
+MOOD_LABELS = {
+    1: "😫 매우 안좋음",
+    2: "🙁 안좋음",
+    3: "😐 보통",
+    4: "🙂 좋음",
+    5: "😄 최고",
+}
+MOOD_COLORS = {
+    1: "#E4EEEC",
+    2: "#BEEAE3",
+    3: "#7FDDD0",
+    4: "#34D7BE",
+    5: "#0F9C87",
+}
+
+
+def render_mood_heatmap(df: pd.DataFrame, weeks: int = 52):
+    """깃허브 잔디밭처럼 최근 N주간의 기분을 칸 색깔로 보여줍니다. 칸을 클릭하면
+    그날 몇 시에 어떤 기분을 기록했는지 팝업으로 보여줘요."""
+    today = date.today()
+    start = today - timedelta(weeks=weeks - 1)
+    start -= timedelta(days=(start.weekday() + 1) % 7)  # 그 주의 일요일로 맞춤
+
+    day_scores: dict = {}
+    day_entries: dict = {}
+    tmp = df.copy()
+    tmp["_d"] = pd.to_datetime(tmp["날짜"], errors="coerce").dt.date
+    for _, row in tmp.dropna(subset=["_d"]).iterrows():
+        try:
+            score = int(row["기분"])
+        except (ValueError, TypeError):
+            continue
+        d = row["_d"]
+        day_scores.setdefault(d, []).append(score)
+        day_entries.setdefault(d, []).append(
+            {
+                "time": str(row.get("시간", "") or "").strip(),
+                "label": html.escape(MOOD_LABELS.get(score, "")),
+                "memo": html.escape(str(row.get("메모", "") or "").strip()),
+            }
+        )
+    mood_by_date = {d: round(sum(s) / len(s)) for d, s in day_scores.items() if s}
+    for d in day_entries:
+        day_entries[d].sort(key=lambda e: e["time"])
+
+    total_days = weeks * 7
+    cells_html = ""
+    for i in range(total_days):
+        d = start + timedelta(days=i)
+        if d > today:
+            cells_html += '<div class="mood-cell mood-cell-future"></div>'
+            continue
+        score = mood_by_date.get(d)
+        if score:
+            scores = day_scores[d]
+            color = MOOD_COLORS.get(score, MOOD_COLORS[3])
+            avg_label = MOOD_LABELS.get(score, "")
+            count_note = f" ({len(scores)}회 기록)" if len(scores) > 1 else ""
+            title = f"{d.strftime('%Y-%m-%d')} · {avg_label}{count_note}"
+            payload = html.escape(
+                json.dumps(
+                    {"date": d.strftime("%Y-%m-%d"), "avg": avg_label, "entries": day_entries.get(d, [])},
+                    ensure_ascii=False,
+                )
+            )
+            cells_html += (
+                f'<div class="mood-cell mood-cell-hasdata" style="background:{color};" '
+                f'title="{title}" data-detail="{payload}"></div>'
+            )
+        else:
+            color = "var(--surface)"
+            title = f"{d.strftime('%Y-%m-%d')} · 기록 없음"
+            cells_html += f'<div class="mood-cell" style="background:{color};" title="{title}"></div>'
+
+    st.markdown(
+        f'<div class="mood-grid-wrap"><div class="mood-grid">{cells_html}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    legend_dots = "".join(
+        f'<span class="mood-legend-dot" style="background:{MOOD_COLORS[s]};"></span>'
+        for s in range(1, 6)
+    )
+    st.markdown(
+        f'<div class="mood-legend"><span>별로</span>{legend_dots}<span>최고</span></div>',
+        unsafe_allow_html=True,
+    )
+
+    recorded = tmp.dropna(subset=["_d"])
+    streak = 0
+    cur = today
+    recorded_dates = set(mood_by_date.keys())
+    while cur in recorded_dates:
+        streak += 1
+        cur -= timedelta(days=1)
+    c1, c2 = st.columns(2, gap="medium")
+    c1.metric("연속 기록", f"🔥 {streak}일")
+    if not recorded.empty:
+        try:
+            avg = pd.to_numeric(recorded["기분"], errors="coerce").mean()
+            c2.metric("평균 기분", f"{round(avg, 1)} / 5")
+        except Exception:
+            pass
+
+
+# ==================== 사랑 고백 ====================
+def render_love_notes(df: pd.DataFrame):
+    order = st.selectbox(
+        "정렬", ["최신순", "오래된순"], key="LoveNotes_sort_order",
+        label_visibility="collapsed",
+    )
+    sorted_df = df.sort_values("날짜", ascending=(order == "오래된순"))
+    for idx, row in sorted_df.iterrows():
+        with st.container(border=True, key=f"love_note_{idx}"):
+            c1, c2 = st.columns([6, 1])
+            with c1:
+                content = str(row.get("내용", "")).replace("<", "&lt;").replace(">", "&gt;")
+                st.markdown(
+                    f'<div><span class="love-note-date">💌 {row.get("날짜", "")}</span>'
+                    f'<p class="love-note-text">{content}</p></div>',
+                    unsafe_allow_html=True,
+                )
+            with c2:
+                if st.button("🗑️", key=f"love_delete_{idx}"):
+                    storage.delete_rows("LoveNotes", [idx])
+                    st.success("삭제했어요!")
+                    st.rerun()
 
 
 # ==================== 헤더 (연결 상태 배지 포함) ====================
@@ -772,14 +1376,37 @@ st.markdown(
 if _mode == "local":
     st.caption("앱을 재시작하면 기록이 사라질 수 있어요. SETUP_GUIDE.md 를 참고해서 구글 시트에 연결해보세요.")
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["👕 옷 기록", "😂 짤 뽑기", "📚 책/영화", "💰 가계부", "🔥 습관 트래커"]
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+    ["👕 옷 기록", "😊 기분 기록", "📚 책/영화", "💰 가계부", "🔥 습관 트래커", "💌 사랑고백"]
 )
 
 # ==================== 1. 옷 기록 ====================
 with tab1:
+    st.markdown('<div id="outfit-top-anchor"></div>', unsafe_allow_html=True)
     df = storage.load_df("Outfits")
     st.markdown(f'<p class="section-title">오늘 뭐 입었지? · 총 {len(df)}개 기록</p>', unsafe_allow_html=True)
+
+    # 달력에서 "이 날짜 수정"을 누르면 값이 여기(위젯이 만들어지기 전)에서 반영돼요.
+    _pending_edit = st.session_state.pop("_outfit_edit_pending", None)
+    if _pending_edit:
+        for _k, _v in _pending_edit.items():
+            st.session_state[_k] = _v
+
+    # 달력은 화면 아래쪽에 있어서, 거기서 "수정" 버튼을 눌러도 위쪽 폼이 바뀐 걸
+    # 못 보고 지나치기 쉬워요. 폼이 있는 위치로 자동으로 스크롤해줍니다.
+    if st.session_state.pop("_scroll_to_outfit_form", False):
+        components.html(
+            """
+            <script>
+            (function() {
+                const doc = window.parent.document;
+                const el = doc.getElementById('outfit-top-anchor');
+                if (el) { el.scrollIntoView({behavior: 'smooth', block: 'start'}); }
+            })();
+            </script>
+            """,
+            height=0, width=0,
+        )
 
     def _outfit_options(col: str):
         if df.empty or col not in df.columns:
@@ -788,7 +1415,49 @@ with tab1:
         s = s[s.str.strip() != ""]
         return s.value_counts().index.tolist()
 
-    with st.form("outfit_form", clear_on_submit=True):
+    def _item_color_map(item_col: str, color_col: str) -> dict:
+        if df.empty or item_col not in df.columns:
+            return {}
+        sub = df[[item_col, color_col]].dropna(subset=[item_col]) if color_col in df.columns else pd.DataFrame()
+        m = {}
+        for _, r in sub.iterrows():
+            val = str(r[item_col]).strip()
+            color = str(r.get(color_col, "") or "").strip()
+            if val and color:
+                m[val] = color  # 뒤에 나온(더 최근) 기록이 우선되도록 계속 덮어씀
+        return m
+
+    _COLOR_MAPS = {col: _item_color_map(col, f"{col}색상") for col, _ in OUTFIT_COLS}
+
+    def _on_item_change(col: str):
+        suffix = OUTFIT_KEY_SUFFIX[col]
+        val = st.session_state.get(f"outfit_{suffix}")
+        if val:
+            matched = _COLOR_MAPS[col].get(str(val).strip())
+            if matched:
+                st.session_state[f"outfit_{suffix}_color"] = matched
+
+    def _clear_outfit_form_state():
+        for _col, _ in OUTFIT_COLS:
+            _suffix = OUTFIT_KEY_SUFFIX[_col]
+            st.session_state.pop(f"outfit_{_suffix}", None)
+            st.session_state.pop(f"outfit_{_suffix}_color", None)
+        st.session_state.pop("outfit_memo", None)
+        st.session_state.pop("outfit_date", None)
+        st.session_state.pop("outfit_edit_date", None)
+        st.session_state.pop("_outfit_edit_pending", None)
+
+    edit_date = st.session_state.get("outfit_edit_date")
+    if edit_date:
+        ec1, ec2 = st.columns([5, 1])
+        with ec1:
+            st.info(f"✏️ {edit_date} 기록을 수정하는 중이에요. 저장하면 그날 기존 기록을 덮어써요.")
+        with ec2:
+            if st.button("취소", key="outfit_edit_cancel", use_container_width=True):
+                _clear_outfit_form_state()
+                st.rerun()
+
+    with st.container(border=True, key="outfit_form_card"):
         d = st.date_input("날짜", value=date.today(), key="outfit_date")
 
         st.markdown('<p class="sub-label">아이템</p>', unsafe_allow_html=True)
@@ -797,29 +1466,34 @@ with tab1:
             top = st.selectbox(
                 "상의", options=_outfit_options("상의"), index=None,
                 placeholder="선택/입력", accept_new_options=True, key="outfit_top",
+                on_change=_on_item_change, args=("상의",),
             )
         with c2:
             bottom = st.selectbox(
                 "하의", options=_outfit_options("하의"), index=None,
                 placeholder="선택/입력", accept_new_options=True, key="outfit_bottom",
+                on_change=_on_item_change, args=("하의",),
             )
         with c3:
             bag = st.selectbox(
                 "가방", options=_outfit_options("가방"), index=None,
                 placeholder="선택/입력", accept_new_options=True, key="outfit_bag",
+                on_change=_on_item_change, args=("가방",),
             )
         with c4:
             socks = st.selectbox(
                 "양말", options=_outfit_options("양말"), index=None,
                 placeholder="선택/입력", accept_new_options=True, key="outfit_socks",
+                on_change=_on_item_change, args=("양말",),
             )
         with c5:
             shoes = st.selectbox(
                 "신발", options=_outfit_options("신발"), index=None,
                 placeholder="선택/입력", accept_new_options=True, key="outfit_shoes",
+                on_change=_on_item_change, args=("신발",),
             )
 
-        st.markdown('<p class="sub-label">색상 (선택)</p>', unsafe_allow_html=True)
+        st.markdown('<p class="sub-label">색상 (선택 · 같은 아이템을 다시 고르면 자동으로 채워져요)</p>', unsafe_allow_html=True)
         cc1, cc2, cc3, cc4, cc5 = st.columns(5, gap="small")
         with cc1:
             top_color = st.selectbox(
@@ -849,9 +1523,16 @@ with tab1:
 
         st.caption("💡 목록에 없는 걸 새로 입력했다면, 다음 칸으로 넘어가기 전에 꼭 Enter를 눌러 확정해주세요.")
         memo = st.text_input("메모 (선택)", placeholder="예: 좀 더웠음", key="outfit_memo")
-        submitted = st.form_submit_button("✏️ 기록하기", use_container_width=True, type="primary")
+        submit_label = "💾 수정 완료" if edit_date else "✏️ 기록하기"
+        submitted = st.button(submit_label, use_container_width=True, type="primary", key="outfit_submit_btn")
         if submitted:
             if any([top, bottom, bag, socks, shoes]):
+                if edit_date:
+                    existing_idx = df.index[
+                        pd.to_datetime(df["날짜"], errors="coerce").dt.date == edit_date
+                    ].tolist()
+                    if existing_idx:
+                        storage.delete_rows("Outfits", existing_idx)
                 storage.append_row(
                     "Outfits",
                     {
@@ -869,6 +1550,7 @@ with tab1:
                         "신발색상": shoes_color or "",
                     },
                 )
+                _clear_outfit_form_state()
                 st.success("기록했어요!")
                 st.rerun()
             else:
@@ -885,66 +1567,55 @@ with tab1:
             with list_tab:
                 render_outfit_list(df)
 
-# ==================== 2. 짤 뽑기 ====================
+# ==================== 2. 기분 기록 ====================
 with tab2:
-    st.markdown('<p class="section-title">기분 전환이 필요할 때 😊</p>', unsafe_allow_html=True)
+    df = storage.load_df("Moods")
+    st.markdown('<p class="section-title">지금 기분은 어때요?</p>', unsafe_allow_html=True)
+    st.caption("하루에 여러 번 기록할 수 있어요. 예: 출근할 때, 점심 먹고, 퇴근할 때")
 
-    import random
+    with st.form("mood_form", clear_on_submit=False):
+        c1, c2 = st.columns(2, gap="medium")
+        with c1:
+            mood_date = st.date_input("날짜", value=date.today(), key="mood_date")
+        with c2:
+            mood_time = st.time_input(
+                "시간", value=datetime.now().time().replace(second=0, microsecond=0),
+                step=60, key="mood_time",
+            )
+        mood_score = st.radio(
+            "기분",
+            options=[1, 2, 3, 4, 5],
+            format_func=lambda v: MOOD_LABELS[v],
+            index=2,
+            horizontal=True,
+            key="mood_score",
+        )
+        mood_memo = st.text_input("메모 (선택)", placeholder="예: 회의 많아서 힘들었음", key="mood_memo")
+        mood_submitted = st.form_submit_button("✏️ 기록하기", use_container_width=True, type="primary")
+        if mood_submitted:
+            time_str = mood_time.strftime("%H:%M")
+            # 같은 날짜+시간에 이미 기록이 있으면 덮어씁니다 (그 외엔 하루에 여러 개 쌓여요).
+            existing_idx = df.index[
+                (pd.to_datetime(df["날짜"], errors="coerce").dt.date == mood_date)
+                & (df["시간"].astype(str) == time_str)
+            ].tolist() if not df.empty else []
+            if existing_idx:
+                storage.delete_rows("Moods", existing_idx)
+            storage.append_row(
+                "Moods",
+                {"날짜": str(mood_date), "시간": time_str, "기분": mood_score, "메모": mood_memo},
+            )
+            st.success("기록했어요!")
+            st.rerun()
 
-    _IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp")
-    _MEME_HEADERS = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-        ),
-        "Accept": "application/json, text/plain, */*",
-    }
-    # 기본(영어권) + 한국 관련 서브레딧을 섞어서 랜덤으로 골라요.
-    # (레딧 기반이라 완전한 국내 짤방 느낌은 아니지만, 최소한 한국 관련 짤도 섞여 나와요)
-    _MEME_SUBREDDITS = [
-        "memes", "dankmemes", "me_irl",
-        "KoreanMemes", "hanguk", "hanguk", "KoreanMemes",
-    ]
-
-    def _fetch_meme(max_tries: int = 3):
-        st.session_state["meme_error"] = None
-        last_err = None
-        for _ in range(max_tries):
-            sub = random.choice(_MEME_SUBREDDITS)
-            try:
-                res = requests.get(
-                    f"https://meme-api.com/gimme/{sub}", timeout=6, headers=_MEME_HEADERS
-                )
-                res.raise_for_status()
-                data = res.json()
-            except Exception as e:
-                last_err = f"{type(e).__name__}: {e}"
-                continue
-            url = (data.get("url") or "").lower()
-            if url.endswith(_IMAGE_EXTS):
-                st.session_state["meme"] = data
-                return
-            last_err = "이미지 형식이 아닌 결과(동영상 등)라 건너뜀"
-        # 여기까지 왔으면 전부 실패
-        st.session_state["meme"] = None
-        st.session_state["meme_error"] = last_err
-
-    if "meme" not in st.session_state:
-        _fetch_meme()
-
-    col_a, col_b = st.columns([1, 3])
-    with col_a:
-        if st.button("🎲 랜덤 짤 뽑기", use_container_width=True):
-            _fetch_meme()
-
-    meme = st.session_state.get("meme")
-    if meme:
-        st.image(meme.get("url"), caption=meme.get("title"), use_container_width=True)
-    else:
-        st.warning("짤을 불러오지 못했어요. 버튼을 다시 눌러보세요.")
-        err = st.session_state.get("meme_error")
-        if err:
-            st.caption(f"오류 내용: {err}")
+    st.write("")
+    with st.container(border=True, key="mood_results"):
+        if df.empty:
+            st.caption("아직 기록이 없어요. 오늘 기분부터 남겨보세요 🙂")
+        else:
+            render_mood_heatmap(df)
+            st.write("")
+            render_deletable_table("Moods", df)
 
 # ==================== 3. 책/영화 기록 ====================
 with tab3:
@@ -1079,3 +1750,31 @@ with tab5:
             render_deletable_table("Habits", df)
         else:
             st.caption("아직 기록이 없어요. 오늘부터 만들고 싶은 습관을 기록해보세요 💪")
+
+# ==================== 6. 사랑 고백 ====================
+with tab6:
+    df = storage.load_df("LoveNotes")
+    st.markdown(f'<p class="section-title">남편에게 전하는 마음 · 총 {len(df)}개</p>', unsafe_allow_html=True)
+
+    with st.form("love_form", clear_on_submit=True):
+        love_date = st.date_input("날짜", value=date.today(), key="love_date")
+        love_text = st.text_area(
+            "오늘의 사랑 고백 💌",
+            placeholder="예: 오늘 아침에 커피 타준 거 너무 고마웠어. 사랑해 ❤️",
+            key="love_text", height=100,
+        )
+        love_submitted = st.form_submit_button("💌 마음 전하기", use_container_width=True, type="primary")
+        if love_submitted:
+            if love_text.strip():
+                storage.append_row("LoveNotes", {"날짜": str(love_date), "내용": love_text})
+                st.success("기록했어요! 오늘도 사랑이 +1 됐어요 💕")
+                st.rerun()
+            else:
+                st.warning("내용을 입력해주세요.")
+
+    st.write("")
+    with st.container(border=True, key="love_results"):
+        if df.empty:
+            st.caption("아직 기록이 없어요. 오늘의 사랑을 첫 줄로 남겨보세요 💌")
+        else:
+            render_love_notes(df)

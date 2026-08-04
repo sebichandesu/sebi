@@ -43,6 +43,8 @@ SHEET_SCHEMAS = {
     "Media": ["날짜", "종류", "제목", "별점", "감상평"],
     "Expenses": ["날짜", "카테고리", "금액", "메모"],
     "Habits": ["날짜", "습관", "완료"],
+    "Moods": ["날짜", "시간", "기분", "메모"],
+    "LoveNotes": ["날짜", "내용"],
 }
 
 
@@ -170,7 +172,7 @@ def _get_gspread_client():
     return gspread.authorize(creds)
 
 
-def _get_worksheet(sheet_name: str):
+def _get_worksheet_uncached(sheet_name: str):
     client = _get_gspread_client()
     sh = client.open_by_key(st.secrets["sheet_id"])
     expected_headers = SHEET_SCHEMAS[sheet_name]
@@ -194,11 +196,24 @@ def _get_worksheet(sheet_name: str):
     return ws
 
 
+# 시트/헤더 조회(open_by_key, worksheet 찾기, 헤더 확인)는 매 API 호출마다 반복하면
+# 구글 시트 API의 분당 읽기 한도(기본 60회/분)를 금방 넘길 수 있어요. 워크시트 객체
+# 자체를 잠깐 캐싱해서 같은 시트를 반복해서 여는 것을 줄입니다.
+@st.cache_resource(ttl=120, show_spinner=False)
+def _get_worksheet(sheet_name: str):
+    return _get_worksheet_uncached(sheet_name)
+
+
 def _local_path(sheet_name: str) -> str:
     os.makedirs(DATA_DIR, exist_ok=True)
     return os.path.join(DATA_DIR, f"{sheet_name}.csv")
 
 
+# 옷/기분/가계부 등 폼에서 아이템을 하나씩 고를 때마다(색상 자동완성 등) 화면이
+# 다시 그려지는데, 그때마다 매번 구글 시트를 새로 읽으면 API 읽기 한도를 순식간에
+# 넘겨버려요(429 Quota exceeded). 짧은 시간(20초) 동안은 캐시된 값을 재사용하고,
+# append_row/delete_rows로 실제 데이터가 바뀔 때만 캐시를 비워서 최신 데이터를 다시 읽습니다.
+@st.cache_data(ttl=20, show_spinner=False)
 def load_df(sheet_name: str) -> pd.DataFrame:
     columns = SHEET_SCHEMAS[sheet_name]
 
@@ -236,6 +251,7 @@ def append_row(sheet_name: str, row: dict):
         row_values = [row.get(c, "") for c in columns]
         ws = _get_worksheet(sheet_name)
         ws.append_row(row_values)
+        load_df.clear()
         return
 
     if _use_apps_script():
@@ -246,6 +262,7 @@ def append_row(sheet_name: str, row: dict):
                 f"저장 확인 응답을 못 받았어요 (구글 쪽 일시적 문제일 수 있어요). "
                 f"구글 시트를 열어서 실제로 저장됐는지 확인해보세요. ({e})"
             )
+        load_df.clear()
         return
 
     row_values = [row.get(c, "") for c in columns]
@@ -254,6 +271,7 @@ def append_row(sheet_name: str, row: dict):
     new_row = pd.DataFrame([row_values], columns=columns)
     df = pd.concat([df, new_row], ignore_index=True)
     df.to_csv(path, index=False)
+    load_df.clear()
 
 
 def delete_rows(sheet_name: str, indices):
@@ -267,6 +285,7 @@ def delete_rows(sheet_name: str, indices):
         # 시트 1행은 헤더이므로, 데이터 i번째 행(0-base)은 실제 시트의 (i+2)번째 행
         for i in indices:
             ws.delete_rows(i + 2)
+        load_df.clear()
         return
 
     if _use_apps_script():
@@ -278,3 +297,4 @@ def delete_rows(sheet_name: str, indices):
     df = load_df(sheet_name)
     df = df.drop(df.index[indices]).reset_index(drop=True)
     df.to_csv(path, index=False)
+    load_df.clear()
