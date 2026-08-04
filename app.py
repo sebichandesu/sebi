@@ -669,7 +669,7 @@ BGM_PLAYER_JS = f"""
     const style = doc.createElement('style');
     style.textContent = `
         #mallang-bgm-wrap {{
-            position: fixed; right: 20px; bottom: 20px; z-index: 999998;
+            position: fixed; left: 20px; bottom: 20px; z-index: 999998;
             font-family: 'Pretendard','Malgun Gothic',-apple-system,sans-serif;
         }}
         #mallang-bgm-toggle {{
@@ -686,7 +686,7 @@ BGM_PLAYER_JS = f"""
             50% {{ box-shadow: 0 6px 16px rgba(45,212,191,0.4), 0 0 0 8px rgba(45,212,191,0); }}
         }}
         #mallang-bgm-panel {{
-            position: absolute; bottom: 58px; right: 0; width: 230px;
+            position: absolute; bottom: 58px; left: 0; width: 230px;
             background: #fff; border: 1px solid #DCEEEC; border-radius: 16px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.16); padding: 14px;
             display: none;
