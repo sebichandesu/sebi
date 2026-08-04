@@ -647,14 +647,16 @@ components.html(STAR_TRAIL_JS, height=0, width=0)
 
 
 # ==================== 배경음악(BGM) 플레이어 ====================
-# 저작권 걱정 없이 쓸 수 있는 무료 데모 트랙(SoundHelix)으로 구성한 플레이리스트.
+# SoundHelix 데모 트랙은 분위기가 안 맞아서(록/일렉트로닉 느낌), 무료 저작권(CC BY)
+# 트랙 중 통통 튀고 귀여운 느낌의 곡들(Kevin MacLeod, incompetech.com)로 교체.
 BGM_PLAYLIST = [
-    {"name": "잔잔한 아침", "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"},
-    {"name": "말랑말랑 오후", "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"},
-    {"name": "다이어리 타임", "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"},
-    {"name": "느긋한 하루", "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"},
-    {"name": "포근한 밤", "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3"},
+    {"name": "말랑말랑 아침", "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Merry%20Go.mp3"},
+    {"name": "걱정 없는 하루", "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Carefree.mp3"},
+    {"name": "깜찍 소동", "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Monkeys%20Spinning%20Monkeys.mp3"},
+    {"name": "폭신폭신 오후", "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Fluffing%20a%20Duck.mp3"},
+    {"name": "포근포근 밤", "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Wallpaper.mp3"},
 ]
+BGM_CREDIT = "🎵 Kevin MacLeod (incompetech.com) · CC BY"
 
 BGM_PLAYER_JS = f"""
 <script>
@@ -672,19 +674,37 @@ BGM_PLAYER_JS = f"""
             position: fixed; left: 20px; bottom: 20px; z-index: 999998;
             font-family: 'Pretendard','Malgun Gothic',-apple-system,sans-serif;
         }}
+        .mallang-bgm-pill {{
+            display: flex; align-items: center; gap: 5px; padding: 6px 10px;
+            background: #E7FBF8; border: 1px solid #BEEEE7; border-radius: 26px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.14);
+        }}
+        .mallang-bgm-charm {{ font-size: 14px; opacity: 0.85; transform: rotate(-8deg); animation: mallang-bgm-charm-sway 2.6s ease-in-out infinite; }}
+        @keyframes mallang-bgm-charm-sway {{
+            0%, 100% {{ transform: translateY(0) rotate(-8deg); }}
+            50% {{ transform: translateY(-2px) rotate(6deg); }}
+        }}
         #mallang-bgm-toggle {{
-            width: 46px; height: 46px; border-radius: 50%; border: none; cursor: pointer;
+            width: 36px; height: 36px; border-radius: 50%; border: 2px solid #fff; cursor: pointer;
             background: linear-gradient(135deg, #2DD4BF 0%, #38BDF8 100%);
-            color: #fff; font-size: 19px; box-shadow: 0 6px 16px rgba(45,212,191,0.4);
-            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 15px; box-shadow: 0 2px 8px rgba(45,212,191,0.4);
+            display: flex; align-items: center; justify-content: center; position: relative;
             transition: transform 0.15s ease;
         }}
-        #mallang-bgm-toggle:hover {{ transform: scale(1.08); }}
+        #mallang-bgm-toggle:hover {{ transform: translateY(-3px) rotate(-8deg) scale(1.12); }}
+        #mallang-bgm-toggle:active {{ transform: scale(0.9); }}
         #mallang-bgm-toggle.playing {{ animation: mallang-bgm-pulse 1.2s ease-in-out infinite; }}
         @keyframes mallang-bgm-pulse {{
-            0%, 100% {{ box-shadow: 0 6px 16px rgba(45,212,191,0.4), 0 0 0 0 rgba(45,212,191,0.3); }}
-            50% {{ box-shadow: 0 6px 16px rgba(45,212,191,0.4), 0 0 0 8px rgba(45,212,191,0); }}
+            0%, 100% {{ box-shadow: 0 2px 8px rgba(45,212,191,0.4), 0 0 0 0 rgba(45,212,191,0.35); }}
+            50% {{ box-shadow: 0 2px 8px rgba(45,212,191,0.4), 0 0 0 7px rgba(45,212,191,0); }}
         }}
+        #mallang-bgm-toggle::after {{
+            content: '음악'; position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%);
+            font-size: 10px; font-weight: 700; color: #0F9C87; background: #fff; padding: 3px 8px; border-radius: 10px;
+            white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+        }}
+        #mallang-bgm-toggle:hover::after {{ opacity: 1; transform: translateX(-50%) translateY(-2px); }}
         #mallang-bgm-panel {{
             position: absolute; bottom: 58px; left: 0; width: 230px;
             background: #fff; border: 1px solid #DCEEEC; border-radius: 16px;
@@ -698,14 +718,16 @@ BGM_PLAYER_JS = f"""
         .mallang-bgm-controls button {{
             width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid #DCEEEC; background: #fff;
             cursor: pointer; font-size: 13px; color: #1C2B2A; display: flex; align-items: center; justify-content: center;
+            transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
         }}
-        .mallang-bgm-controls button:hover {{ background: #E7FBF8; border-color: #2DD4BF; }}
+        .mallang-bgm-controls button:hover {{ background: #E7FBF8; border-color: #2DD4BF; transform: scale(1.1); }}
         #mallang-bgm-play {{
             width: 42px; height: 42px; background: #2DD4BF; color: #fff; border-color: #2DD4BF; font-size: 15px;
         }}
         #mallang-bgm-play:hover {{ background: #26bfab; }}
-        #mallang-bgm-vol-row {{ display: flex; align-items: center; gap: 6px; font-size: 12px; color: #6B8C89; }}
+        #mallang-bgm-vol-row {{ display: flex; align-items: center; gap: 6px; font-size: 12px; color: #6B8C89; margin-bottom: 8px; }}
         #mallang-bgm-vol {{ width: 100%; accent-color: #2DD4BF; cursor: pointer; }}
+        #mallang-bgm-credit {{ font-size: 10px; color: #9BB5B2; text-align: center; }}
     `;
     doc.head.appendChild(style);
 
@@ -723,8 +745,12 @@ BGM_PLAYER_JS = f"""
             <div id="mallang-bgm-vol-row">
                 🔈 <input type="range" id="mallang-bgm-vol" min="0" max="100" value="45" />
             </div>
+            <div id="mallang-bgm-credit">{BGM_CREDIT}</div>
         </div>
-        <button id="mallang-bgm-toggle" title="음악">🎵</button>
+        <div class="mallang-bgm-pill">
+            <span class="mallang-bgm-charm">🍡</span>
+            <button id="mallang-bgm-toggle" title="음악">🎵</button>
+        </div>
     `;
     doc.body.appendChild(wrap);
 
