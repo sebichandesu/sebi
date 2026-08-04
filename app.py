@@ -1190,7 +1190,7 @@ def render_deletable_table(sheet_name: str, df: pd.DataFrame, sort_col: str = "�
     if selected:
         original_idx = display_df.iloc[selected].index.tolist()
         if on_edit and len(selected) == 1:
-            ec1, ec2 = st.columns(2, gap="small")
+            ec1, ec2 = st.container(key=f"{sheet_name}_edit_del_btnrow").columns(2, gap="small")
             with ec1:
                 if st.button("✏️ 수정", key=f"{sheet_name}_edit_btn", use_container_width=True):
                     on_edit(original_idx[0], df.loc[original_idx[0]])
@@ -1308,7 +1308,7 @@ def render_outfit_calendar(df: pd.DataFrame):
     year, month = st.session_state[key]
 
     nav_ctx = st.container(key="outfit_cal_nav")
-    nav1, nav2, nav3 = nav_ctx.columns([1, 3, 1])
+    nav1, nav2, nav3 = nav_ctx.columns([1, 3, 1], vertical_alignment="center")
     with nav1:
         if st.button("◀", key="outfit_cal_prev", use_container_width=True):
             month -= 1
@@ -1415,7 +1415,7 @@ def render_outfit_calendar(df: pd.DataFrame):
         original_positions = df.index[
             pd.to_datetime(df["날짜"], errors="coerce").dt.date == picked
         ].tolist()
-        bcol1, bcol2 = st.columns(2, gap="small")
+        bcol1, bcol2 = st.container(key="outfit_cal_pick_btnrow").columns(2, gap="small")
         with bcol1:
             if st.button("✏️ 이 날짜 수정", key="outfit_cal_edit_btn", use_container_width=True):
                 _start_outfit_edit(picked, row)
@@ -1455,7 +1455,7 @@ def render_mood_calendar(df: pd.DataFrame):
     year, month = st.session_state[key]
 
     nav_ctx = st.container(key="mood_cal_nav")
-    nav1, nav2, nav3 = nav_ctx.columns([1, 3, 1])
+    nav1, nav2, nav3 = nav_ctx.columns([1, 3, 1], vertical_alignment="center")
     with nav1:
         if st.button("◀", key="mood_cal_prev", use_container_width=True):
             month -= 1
@@ -1692,7 +1692,7 @@ with tab1:
 
     edit_date = st.session_state.get("outfit_edit_date")
     if edit_date:
-        ec1, ec2 = st.columns([5, 1])
+        ec1, ec2 = st.container(key="outfit_editbanner_btnrow").columns([5, 1])
         with ec1:
             st.info(f"✏️ {edit_date} 기록을 수정하는 중이에요. 저장하면 그날 기존 기록을 덮어써요.")
         with ec2:
