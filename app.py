@@ -1,6 +1,7 @@
 import calendar as cal_module
 import html
 import json
+from urllib.parse import quote as _urlquote
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -317,6 +318,19 @@ div[data-testid="stAlertContentSuccess"] svg {
     fill: #10B981 !important;
 }
 
+/* 기록하기 폼을 접었다 펼 수 있는 expander - 카드 톤에 맞춤 */
+div[data-testid="stExpander"] {
+    border: 1px solid var(--border) !important;
+    border-radius: 16px !important;
+    background-color: var(--surface);
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 2px 12px rgba(20, 184, 166, 0.05);
+}
+div[data-testid="stExpander"] summary, div[data-testid="stExpander"] > div:first-child {
+    font-weight: 700 !important;
+}
+
 /* 결과/기록 영역 카드 - 폼과 시각적으로 구분 */
 .st-key-outfit_results, .st-key-media_results,
 .st-key-expense_results, .st-key-habit_results {
@@ -525,10 +539,10 @@ div[class*="st-key-love_delete_"] button:hover {
 
 /* 모바일 대응 */
 @media (max-width: 640px) {
-    .main .block-container {
-        padding-left: 1rem;
-        padding-right: 1rem;
-        padding-top: 1.4rem;
+    div[data-testid="stMainBlockContainer"], .main .block-container {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        padding-top: 1.4rem !important;
     }
     .hero {
         padding: 1.5rem 1.3rem;
@@ -550,11 +564,40 @@ div[class*="st-key-love_delete_"] button:hover {
         font-size: 0.82rem;
         white-space: nowrap;
     }
-    div[data-testid="stForm"] {
-        padding: 1.2rem 1.1rem 0.6rem 1.1rem;
+    div[data-testid="stForm"], .st-key-outfit_form_card {
+        padding: 1.2rem 1.1rem 0.6rem 1.1rem !important;
     }
-    .cal-cell {
-        min-height: 46px;
+
+    /* 옷 기록 달력 - 좁은 화면에서도 요일 헤더/월 이동/날짜 7칸이 줄바꿈되지 않고
+       한 줄 그리드로 유지되도록 강제 (기본으로는 칸이 좁아지면 세로로 쌓여서
+       달력이 긴 목록처럼 깨져 보임) */
+    div[class*="st-key-outfit_cal_nav"] div[data-testid="stHorizontalBlock"],
+    div[class*="st-key-outfit_cal_grid"] div[data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap !important;
+        gap: 3px !important;
+    }
+    div[class*="st-key-outfit_cal_nav"] div[data-testid="stColumn"],
+    div[class*="st-key-outfit_cal_grid"] div[data-testid="stColumn"] {
+        min-width: 0 !important;
+        width: auto !important;
+        flex: 1 1 0 !important;
+        padding: 0 1px !important;
+    }
+    div[class*="st-key-outfit_cal_day_"] button {
+        min-height: 38px;
+        padding: 0.2rem 0 0.5rem 0 !important;
+        font-size: 0.68rem !important;
+    }
+    .cal-weekday {
+        font-size: 0.64rem;
+    }
+    .cal-month-label {
+        font-size: 0.88rem;
+    }
+
+    /* 떠있는 위젯(BGM/기분 팝업)이 화면 폭을 넘지 않도록 */
+    #mallang-bgm-panel, #mallang-mood-popup {
+        max-width: calc(100vw - 40px) !important;
     }
 }
 </style>
@@ -647,16 +690,16 @@ components.html(STAR_TRAIL_JS, height=0, width=0)
 
 
 # ==================== 배경음악(BGM) 플레이어 ====================
-# SoundHelix 데모 트랙은 분위기가 안 맞아서(록/일렉트로닉 느낌), 무료 저작권(CC BY)
-# 트랙 중 통통 튀고 귀여운 느낌의 곡들(Kevin MacLeod, incompetech.com)로 교체.
+# 직접 만든 곡을 BGM으로 사용 - repo의 static/ 폴더에 넣어두고
+# (.streamlit/config.toml 에서 enableStaticServing = true 설정),
+# 앱에서는 "app/static/파일명" 경로로 그대로 재생합니다.
 BGM_PLAYLIST = [
-    {"name": "말랑말랑 아침", "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Merry%20Go.mp3"},
-    {"name": "걱정 없는 하루", "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Carefree.mp3"},
-    {"name": "깜찍 소동", "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Monkeys%20Spinning%20Monkeys.mp3"},
-    {"name": "폭신폭신 오후", "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Fluffing%20a%20Duck.mp3"},
-    {"name": "포근포근 밤", "url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Wallpaper.mp3"},
+    {"name": "🫧 거품", "file": "거품.mp3"},
+    {"name": "💧 유선형", "file": "유선형.mp3"},
+    {"name": "🎐 우음", "file": "우음.mp3"},
 ]
-BGM_CREDIT = "🎵 Kevin MacLeod (incompetech.com) · CC BY"
+for _t in BGM_PLAYLIST:
+    _t["url"] = "app/static/" + _urlquote(_t["file"])
 
 BGM_PLAYER_JS = f"""
 <script>
@@ -745,7 +788,7 @@ BGM_PLAYER_JS = f"""
             <div id="mallang-bgm-vol-row">
                 🔈 <input type="range" id="mallang-bgm-vol" min="0" max="100" value="45" />
             </div>
-            <div id="mallang-bgm-credit">{BGM_CREDIT}</div>
+            <div id="mallang-bgm-credit">🎶 내가 만든 노래예요</div>
         </div>
         <div class="mallang-bgm-pill">
             <span class="mallang-bgm-charm">🍡</span>
@@ -1126,7 +1169,8 @@ def render_outfit_calendar(df: pd.DataFrame):
         st.session_state[key] = (today.year, today.month)
     year, month = st.session_state[key]
 
-    nav1, nav2, nav3 = st.columns([1, 3, 1])
+    nav_ctx = st.container(key="outfit_cal_nav")
+    nav1, nav2, nav3 = nav_ctx.columns([1, 3, 1])
     with nav1:
         if st.button("◀", key="outfit_cal_prev", use_container_width=True):
             month -= 1
@@ -1483,104 +1527,105 @@ with tab1:
                 _clear_outfit_form_state()
                 st.rerun()
 
-    with st.container(border=True, key="outfit_form_card"):
-        d = st.date_input("날짜", value=date.today(), key="outfit_date")
+    with st.expander("✏️ 기록하기", expanded=True, key="outfit_form_exp"):
+        with st.container(border=True, key="outfit_form_card"):
+            d = st.date_input("날짜", value=date.today(), key="outfit_date")
 
-        st.markdown('<p class="sub-label">아이템</p>', unsafe_allow_html=True)
-        c1, c2, c3, c4, c5 = st.columns(5, gap="small")
-        with c1:
-            top = st.selectbox(
-                "상의", options=_outfit_options("상의"), index=None,
-                placeholder="선택/입력", accept_new_options=True, key="outfit_top",
-                on_change=_on_item_change, args=("상의",),
-            )
-        with c2:
-            bottom = st.selectbox(
-                "하의", options=_outfit_options("하의"), index=None,
-                placeholder="선택/입력", accept_new_options=True, key="outfit_bottom",
-                on_change=_on_item_change, args=("하의",),
-            )
-        with c3:
-            bag = st.selectbox(
-                "가방", options=_outfit_options("가방"), index=None,
-                placeholder="선택/입력", accept_new_options=True, key="outfit_bag",
-                on_change=_on_item_change, args=("가방",),
-            )
-        with c4:
-            socks = st.selectbox(
-                "양말", options=_outfit_options("양말"), index=None,
-                placeholder="선택/입력", accept_new_options=True, key="outfit_socks",
-                on_change=_on_item_change, args=("양말",),
-            )
-        with c5:
-            shoes = st.selectbox(
-                "신발", options=_outfit_options("신발"), index=None,
-                placeholder="선택/입력", accept_new_options=True, key="outfit_shoes",
-                on_change=_on_item_change, args=("신발",),
-            )
-
-        st.markdown('<p class="sub-label">색상 (선택 · 같은 아이템을 다시 고르면 자동으로 채워져요)</p>', unsafe_allow_html=True)
-        cc1, cc2, cc3, cc4, cc5 = st.columns(5, gap="small")
-        with cc1:
-            top_color = st.selectbox(
-                "상의 색", options=_COLOR_SELECT_OPTIONS, index=None,
-                placeholder="색상", accept_new_options=True, key="outfit_top_color",
-            )
-        with cc2:
-            bottom_color = st.selectbox(
-                "하의 색", options=_COLOR_SELECT_OPTIONS, index=None,
-                placeholder="색상", accept_new_options=True, key="outfit_bottom_color",
-            )
-        with cc3:
-            bag_color = st.selectbox(
-                "가방 색", options=_COLOR_SELECT_OPTIONS, index=None,
-                placeholder="색상", accept_new_options=True, key="outfit_bag_color",
-            )
-        with cc4:
-            socks_color = st.selectbox(
-                "양말 색", options=_COLOR_SELECT_OPTIONS, index=None,
-                placeholder="색상", accept_new_options=True, key="outfit_socks_color",
-            )
-        with cc5:
-            shoes_color = st.selectbox(
-                "신발 색", options=_COLOR_SELECT_OPTIONS, index=None,
-                placeholder="색상", accept_new_options=True, key="outfit_shoes_color",
-            )
-
-        st.caption("💡 목록에 없는 걸 새로 입력했다면, 다음 칸으로 넘어가기 전에 꼭 Enter를 눌러 확정해주세요.")
-        memo = st.text_input("메모 (선택)", placeholder="예: 좀 더웠음", key="outfit_memo")
-        submit_label = "💾 수정 완료" if edit_date else "✏️ 기록하기"
-        submitted = st.button(submit_label, use_container_width=True, type="primary", key="outfit_submit_btn")
-        if submitted:
-            if any([top, bottom, bag, socks, shoes]):
-                if edit_date:
-                    existing_idx = df.index[
-                        pd.to_datetime(df["날짜"], errors="coerce").dt.date == edit_date
-                    ].tolist()
-                    if existing_idx:
-                        storage.delete_rows("Outfits", existing_idx)
-                storage.append_row(
-                    "Outfits",
-                    {
-                        "날짜": str(d),
-                        "상의": top or "",
-                        "하의": bottom or "",
-                        "가방": bag or "",
-                        "양말": socks or "",
-                        "신발": shoes or "",
-                        "메모": memo,
-                        "상의색상": top_color or "",
-                        "하의색상": bottom_color or "",
-                        "가방색상": bag_color or "",
-                        "양말색상": socks_color or "",
-                        "신발색상": shoes_color or "",
-                    },
+            st.markdown('<p class="sub-label">아이템</p>', unsafe_allow_html=True)
+            c1, c2, c3, c4, c5 = st.columns(5, gap="small")
+            with c1:
+                top = st.selectbox(
+                    "상의", options=_outfit_options("상의"), index=None,
+                    placeholder="선택/입력", accept_new_options=True, key="outfit_top",
+                    on_change=_on_item_change, args=("상의",),
                 )
-                _clear_outfit_form_state()
-                st.success("기록했어요!")
-                st.rerun()
-            else:
-                st.warning("적어도 한 항목은 입력해주세요.")
+            with c2:
+                bottom = st.selectbox(
+                    "하의", options=_outfit_options("하의"), index=None,
+                    placeholder="선택/입력", accept_new_options=True, key="outfit_bottom",
+                    on_change=_on_item_change, args=("하의",),
+                )
+            with c3:
+                bag = st.selectbox(
+                    "가방", options=_outfit_options("가방"), index=None,
+                    placeholder="선택/입력", accept_new_options=True, key="outfit_bag",
+                    on_change=_on_item_change, args=("가방",),
+                )
+            with c4:
+                socks = st.selectbox(
+                    "양말", options=_outfit_options("양말"), index=None,
+                    placeholder="선택/입력", accept_new_options=True, key="outfit_socks",
+                    on_change=_on_item_change, args=("양말",),
+                )
+            with c5:
+                shoes = st.selectbox(
+                    "신발", options=_outfit_options("신발"), index=None,
+                    placeholder="선택/입력", accept_new_options=True, key="outfit_shoes",
+                    on_change=_on_item_change, args=("신발",),
+                )
+
+            st.markdown('<p class="sub-label">색상 (선택 · 같은 아이템을 다시 고르면 자동으로 채워져요)</p>', unsafe_allow_html=True)
+            cc1, cc2, cc3, cc4, cc5 = st.columns(5, gap="small")
+            with cc1:
+                top_color = st.selectbox(
+                    "상의 색", options=_COLOR_SELECT_OPTIONS, index=None,
+                    placeholder="색상", accept_new_options=True, key="outfit_top_color",
+                )
+            with cc2:
+                bottom_color = st.selectbox(
+                    "하의 색", options=_COLOR_SELECT_OPTIONS, index=None,
+                    placeholder="색상", accept_new_options=True, key="outfit_bottom_color",
+                )
+            with cc3:
+                bag_color = st.selectbox(
+                    "가방 색", options=_COLOR_SELECT_OPTIONS, index=None,
+                    placeholder="색상", accept_new_options=True, key="outfit_bag_color",
+                )
+            with cc4:
+                socks_color = st.selectbox(
+                    "양말 색", options=_COLOR_SELECT_OPTIONS, index=None,
+                    placeholder="색상", accept_new_options=True, key="outfit_socks_color",
+                )
+            with cc5:
+                shoes_color = st.selectbox(
+                    "신발 색", options=_COLOR_SELECT_OPTIONS, index=None,
+                    placeholder="색상", accept_new_options=True, key="outfit_shoes_color",
+                )
+
+            st.caption("💡 목록에 없는 걸 새로 입력했다면, 다음 칸으로 넘어가기 전에 꼭 Enter를 눌러 확정해주세요.")
+            memo = st.text_input("메모 (선택)", placeholder="예: 좀 더웠음", key="outfit_memo")
+            submit_label = "💾 수정 완료" if edit_date else "✏️ 기록하기"
+            submitted = st.button(submit_label, use_container_width=True, type="primary", key="outfit_submit_btn")
+            if submitted:
+                if any([top, bottom, bag, socks, shoes]):
+                    if edit_date:
+                        existing_idx = df.index[
+                            pd.to_datetime(df["날짜"], errors="coerce").dt.date == edit_date
+                        ].tolist()
+                        if existing_idx:
+                            storage.delete_rows("Outfits", existing_idx)
+                    storage.append_row(
+                        "Outfits",
+                        {
+                            "날짜": str(d),
+                            "상의": top or "",
+                            "하의": bottom or "",
+                            "가방": bag or "",
+                            "양말": socks or "",
+                            "신발": shoes or "",
+                            "메모": memo,
+                            "상의색상": top_color or "",
+                            "하의색상": bottom_color or "",
+                            "가방색상": bag_color or "",
+                            "양말색상": socks_color or "",
+                            "신발색상": shoes_color or "",
+                        },
+                    )
+                    _clear_outfit_form_state()
+                    st.success("기록했어요!")
+                    st.rerun()
+                else:
+                    st.warning("적어도 한 항목은 입력해주세요.")
 
     st.write("")
     with st.container(border=True, key="outfit_results"):
@@ -1599,40 +1644,41 @@ with tab2:
     st.markdown('<p class="section-title">지금 기분은 어때요?</p>', unsafe_allow_html=True)
     st.caption("하루에 여러 번 기록할 수 있어요. 예: 출근할 때, 점심 먹고, 퇴근할 때")
 
-    with st.form("mood_form", clear_on_submit=False):
-        c1, c2 = st.columns(2, gap="medium")
-        with c1:
-            mood_date = st.date_input("날짜", value=date.today(), key="mood_date")
-        with c2:
-            mood_time = st.time_input(
-                "시간", value=datetime.now().time().replace(second=0, microsecond=0),
-                step=60, key="mood_time",
+    with st.expander("✏️ 기록하기", expanded=True, key="mood_form_exp"):
+        with st.form("mood_form", clear_on_submit=False):
+            c1, c2 = st.columns(2, gap="medium")
+            with c1:
+                mood_date = st.date_input("날짜", value=date.today(), key="mood_date")
+            with c2:
+                mood_time = st.time_input(
+                    "시간", value=datetime.now().time().replace(second=0, microsecond=0),
+                    step=60, key="mood_time",
+                )
+            mood_score = st.radio(
+                "기분",
+                options=[1, 2, 3, 4, 5],
+                format_func=lambda v: MOOD_LABELS[v],
+                index=2,
+                horizontal=True,
+                key="mood_score",
             )
-        mood_score = st.radio(
-            "기분",
-            options=[1, 2, 3, 4, 5],
-            format_func=lambda v: MOOD_LABELS[v],
-            index=2,
-            horizontal=True,
-            key="mood_score",
-        )
-        mood_memo = st.text_input("메모 (선택)", placeholder="예: 회의 많아서 힘들었음", key="mood_memo")
-        mood_submitted = st.form_submit_button("✏️ 기록하기", use_container_width=True, type="primary")
-        if mood_submitted:
-            time_str = mood_time.strftime("%H:%M")
-            # 같은 날짜+시간에 이미 기록이 있으면 덮어씁니다 (그 외엔 하루에 여러 개 쌓여요).
-            existing_idx = df.index[
-                (pd.to_datetime(df["날짜"], errors="coerce").dt.date == mood_date)
-                & (df["시간"].astype(str) == time_str)
-            ].tolist() if not df.empty else []
-            if existing_idx:
-                storage.delete_rows("Moods", existing_idx)
-            storage.append_row(
-                "Moods",
-                {"날짜": str(mood_date), "시간": time_str, "기분": mood_score, "메모": mood_memo},
-            )
-            st.success("기록했어요!")
-            st.rerun()
+            mood_memo = st.text_input("메모 (선택)", placeholder="예: 회의 많아서 힘들었음", key="mood_memo")
+            mood_submitted = st.form_submit_button("✏️ 기록하기", use_container_width=True, type="primary")
+            if mood_submitted:
+                time_str = mood_time.strftime("%H:%M")
+                # 같은 날짜+시간에 이미 기록이 있으면 덮어씁니다 (그 외엔 하루에 여러 개 쌓여요).
+                existing_idx = df.index[
+                    (pd.to_datetime(df["날짜"], errors="coerce").dt.date == mood_date)
+                    & (df["시간"].astype(str) == time_str)
+                ].tolist() if not df.empty else []
+                if existing_idx:
+                    storage.delete_rows("Moods", existing_idx)
+                storage.append_row(
+                    "Moods",
+                    {"날짜": str(mood_date), "시간": time_str, "기분": mood_score, "메모": mood_memo},
+                )
+                st.success("기록했어요!")
+                st.rerun()
 
     st.write("")
     with st.container(border=True, key="mood_results"):
@@ -1648,33 +1694,34 @@ with tab3:
     df = storage.load_df("Media")
     st.markdown(f'<p class="section-title">책 / 영화 기록 · 총 {len(df)}개 기록</p>', unsafe_allow_html=True)
 
-    with st.form("media_form", clear_on_submit=True):
-        c1, c2, c3 = st.columns([1, 1, 2], gap="medium")
-        with c1:
-            d = st.date_input("날짜", value=date.today(), key="media_date")
-        with c2:
-            kind = st.radio("종류", ["책", "영화"], horizontal=True, key="media_kind")
-        with c3:
-            title = st.text_input("제목", key="media_title")
-        rating = st.slider("별점", 1, 5, 3, key="media_rating")
-        review = st.text_area("감상평 (선택)", key="media_review")
-        submitted = st.form_submit_button("✏️ 기록하기", use_container_width=True, type="primary")
-        if submitted:
-            if title.strip():
-                storage.append_row(
-                    "Media",
-                    {
-                        "날짜": str(d),
-                        "종류": kind,
-                        "제목": title,
-                        "별점": rating,
-                        "감상평": review,
-                    },
-                )
-                st.success("기록했어요!")
-                st.rerun()
-            else:
-                st.warning("제목을 입력해주세요.")
+    with st.expander("✏️ 기록하기", expanded=True, key="media_form_exp"):
+        with st.form("media_form", clear_on_submit=True):
+            c1, c2, c3 = st.columns([1, 1, 2], gap="medium")
+            with c1:
+                d = st.date_input("날짜", value=date.today(), key="media_date")
+            with c2:
+                kind = st.radio("종류", ["책", "영화"], horizontal=True, key="media_kind")
+            with c3:
+                title = st.text_input("제목", key="media_title")
+            rating = st.slider("별점", 1, 5, 3, key="media_rating")
+            review = st.text_area("감상평 (선택)", key="media_review")
+            submitted = st.form_submit_button("✏️ 기록하기", use_container_width=True, type="primary")
+            if submitted:
+                if title.strip():
+                    storage.append_row(
+                        "Media",
+                        {
+                            "날짜": str(d),
+                            "종류": kind,
+                            "제목": title,
+                            "별점": rating,
+                            "감상평": review,
+                        },
+                    )
+                    st.success("기록했어요!")
+                    st.rerun()
+                else:
+                    st.warning("제목을 입력해주세요.")
 
     st.write("")
     with st.container(border=True, key="media_results"):
@@ -1695,28 +1742,29 @@ with tab4:
     df = storage.load_df("Expenses")
     st.markdown(f'<p class="section-title">가계부 · 총 {len(df)}건</p>', unsafe_allow_html=True)
 
-    with st.form("expense_form", clear_on_submit=True):
-        c1, c2, c3 = st.columns([1, 1, 1], gap="medium")
-        with c1:
-            d = st.date_input("날짜", value=date.today(), key="expense_date")
-        with c2:
-            category = st.selectbox(
-                "카테고리", ["식비", "교통", "쇼핑", "문화생활", "고정비", "기타"], key="expense_cat"
-            )
-        with c3:
-            amount = st.number_input("금액", min_value=0, step=1000, key="expense_amount")
-        memo = st.text_input("메모 (선택)", key="expense_memo")
-        submitted = st.form_submit_button("✏️ 기록하기", use_container_width=True, type="primary")
-        if submitted:
-            if amount > 0:
-                storage.append_row(
-                    "Expenses",
-                    {"날짜": str(d), "카테고리": category, "금액": amount, "메모": memo},
+    with st.expander("✏️ 기록하기", expanded=True, key="expense_form_exp"):
+        with st.form("expense_form", clear_on_submit=True):
+            c1, c2, c3 = st.columns([1, 1, 1], gap="medium")
+            with c1:
+                d = st.date_input("날짜", value=date.today(), key="expense_date")
+            with c2:
+                category = st.selectbox(
+                    "카테고리", ["식비", "교통", "쇼핑", "문화생활", "고정비", "기타"], key="expense_cat"
                 )
-                st.success("기록했어요!")
-                st.rerun()
-            else:
-                st.warning("금액을 입력해주세요.")
+            with c3:
+                amount = st.number_input("금액", min_value=0, step=1000, key="expense_amount")
+            memo = st.text_input("메모 (선택)", key="expense_memo")
+            submitted = st.form_submit_button("✏️ 기록하기", use_container_width=True, type="primary")
+            if submitted:
+                if amount > 0:
+                    storage.append_row(
+                        "Expenses",
+                        {"날짜": str(d), "카테고리": category, "금액": amount, "메모": memo},
+                    )
+                    st.success("기록했어요!")
+                    st.rerun()
+                else:
+                    st.warning("금액을 입력해주세요.")
 
     st.write("")
     with st.container(border=True, key="expense_results"):
@@ -1737,24 +1785,25 @@ with tab5:
     habit_count = df["습관"].dropna().nunique() if not df.empty else 0
     st.markdown(f'<p class="section-title">습관 트래커 · {habit_count}개 습관 관리 중</p>', unsafe_allow_html=True)
 
-    with st.form("habit_form", clear_on_submit=True):
-        c1, c2, c3 = st.columns([1, 2, 1], gap="medium")
-        with c1:
-            d = st.date_input("날짜", value=date.today(), key="habit_date")
-        with c2:
-            habit = st.text_input("습관 이름", placeholder="예: 물 마시기, 운동, 독서", key="habit_name")
-        with c3:
-            done = st.checkbox("완료했어요", value=True, key="habit_done")
-        submitted = st.form_submit_button("✏️ 기록하기", use_container_width=True, type="primary")
-        if submitted:
-            if habit.strip():
-                storage.append_row(
-                    "Habits", {"날짜": str(d), "습관": habit, "완료": done}
-                )
-                st.success("기록했어요!")
-                st.rerun()
-            else:
-                st.warning("습관 이름을 입력해주세요.")
+    with st.expander("✏️ 기록하기", expanded=True, key="habit_form_exp"):
+        with st.form("habit_form", clear_on_submit=True):
+            c1, c2, c3 = st.columns([1, 2, 1], gap="medium")
+            with c1:
+                d = st.date_input("날짜", value=date.today(), key="habit_date")
+            with c2:
+                habit = st.text_input("습관 이름", placeholder="예: 물 마시기, 운동, 독서", key="habit_name")
+            with c3:
+                done = st.checkbox("완료했어요", value=True, key="habit_done")
+            submitted = st.form_submit_button("✏️ 기록하기", use_container_width=True, type="primary")
+            if submitted:
+                if habit.strip():
+                    storage.append_row(
+                        "Habits", {"날짜": str(d), "습관": habit, "완료": done}
+                    )
+                    st.success("기록했어요!")
+                    st.rerun()
+                else:
+                    st.warning("습관 이름을 입력해주세요.")
 
     st.write("")
     with st.container(border=True, key="habit_results"):
@@ -1782,21 +1831,22 @@ with tab6:
     df = storage.load_df("LoveNotes")
     st.markdown(f'<p class="section-title">남편에게 전하는 마음 · 총 {len(df)}개</p>', unsafe_allow_html=True)
 
-    with st.form("love_form", clear_on_submit=True):
-        love_date = st.date_input("날짜", value=date.today(), key="love_date")
-        love_text = st.text_area(
-            "오늘의 사랑 고백 💌",
-            placeholder="예: 오늘 아침에 커피 타준 거 너무 고마웠어. 사랑해 ❤️",
-            key="love_text", height=100,
-        )
-        love_submitted = st.form_submit_button("💌 마음 전하기", use_container_width=True, type="primary")
-        if love_submitted:
-            if love_text.strip():
-                storage.append_row("LoveNotes", {"날짜": str(love_date), "내용": love_text})
-                st.success("기록했어요! 오늘도 사랑이 +1 됐어요 💕")
-                st.rerun()
-            else:
-                st.warning("내용을 입력해주세요.")
+    with st.expander("✏️ 기록하기", expanded=True, key="love_form_exp"):
+        with st.form("love_form", clear_on_submit=True):
+            love_date = st.date_input("날짜", value=date.today(), key="love_date")
+            love_text = st.text_area(
+                "오늘의 사랑 고백 💌",
+                placeholder="예: 오늘 아침에 커피 타준 거 너무 고마웠어. 사랑해 ❤️",
+                key="love_text", height=100,
+            )
+            love_submitted = st.form_submit_button("💌 마음 전하기", use_container_width=True, type="primary")
+            if love_submitted:
+                if love_text.strip():
+                    storage.append_row("LoveNotes", {"날짜": str(love_date), "내용": love_text})
+                    st.success("기록했어요! 오늘도 사랑이 +1 됐어요 💕")
+                    st.rerun()
+                else:
+                    st.warning("내용을 입력해주세요.")
 
     st.write("")
     with st.container(border=True, key="love_results"):
