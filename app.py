@@ -640,6 +640,27 @@ div[class*="st-key-love_note_"] div[data-testid="stColumn"]:nth-child(3) {
         font-size: 0.88rem;
     }
 
+    /* 수정/삭제 버튼, "수정 중이에요" 안내 배너처럼 나란히 있어야 하는 버튼 줄들이
+       좁은 화면에서 세로로 쌓여 깨지는 문제 - 표 안 그 줄(_btnrow로 끝나는 키)은
+       항상 가로 한 줄을 유지하도록 강제 */
+    div[class*="_btnrow"] div[data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap !important;
+        gap: 6px !important;
+    }
+    div[class*="_btnrow"] div[data-testid="stColumn"] {
+        min-width: 0 !important;
+        width: auto !important;
+        flex: 1 1 0 !important;
+        padding: 0 2px !important;
+    }
+    /* 사랑고백 카드의 수정/삭제 아이콘 버튼 줄도 동일하게 */
+    div[class*="st-key-love_note_"] div[data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap !important;
+    }
+    div[class*="st-key-love_note_"] div[data-testid="stColumn"] {
+        min-width: 0 !important;
+    }
+
     /* 떠있는 위젯(BGM/기분 팝업)이 화면 폭을 넘지 않도록 */
     #mallang-bgm-panel, #mallang-mood-popup {
         max-width: calc(100vw - 40px) !important;
@@ -1840,7 +1861,7 @@ with tab2:
         })
 
     if _mood_edit_idx is not None:
-        mc1, mc2 = st.columns([5, 1])
+        mc1, mc2 = st.container(key="Moods_editbanner_btnrow").columns([5, 1])
         with mc1:
             st.info("✏️ 이 기록을 수정하는 중이에요. 저장하면 기존 기록을 덮어써요.")
         with mc2:
@@ -1924,7 +1945,7 @@ with tab3:
         })
 
     if _media_edit_idx is not None:
-        mc1, mc2 = st.columns([5, 1])
+        mc1, mc2 = st.container(key="Media_editbanner_btnrow").columns([5, 1])
         with mc1:
             st.info("✏️ 이 기록을 수정하는 중이에요. 저장하면 기존 기록을 덮어써요.")
         with mc2:
@@ -2004,7 +2025,7 @@ with tab4:
         })
 
     if _expense_edit_idx is not None:
-        mc1, mc2 = st.columns([5, 1])
+        mc1, mc2 = st.container(key="Expenses_editbanner_btnrow").columns([5, 1])
         with mc1:
             st.info("✏️ 이 기록을 수정하는 중이에요. 저장하면 기존 기록을 덮어써요.")
         with mc2:
@@ -2070,7 +2091,7 @@ with tab5:
         })
 
     if _habit_edit_idx is not None:
-        mc1, mc2 = st.columns([5, 1])
+        mc1, mc2 = st.container(key="Habits_editbanner_btnrow").columns([5, 1])
         with mc1:
             st.info("✏️ 이 기록을 수정하는 중이에요. 저장하면 기존 기록을 덮어써요.")
         with mc2:
@@ -2133,7 +2154,7 @@ with tab6:
     _love_edit_widgets = ["love_date", "love_text"]
 
     if _love_edit_idx is not None:
-        mc1, mc2 = st.columns([5, 1])
+        mc1, mc2 = st.container(key="LoveNotes_editbanner_btnrow").columns([5, 1])
         with mc1:
             st.info("✏️ 이 기록을 수정하는 중이에요. 저장하면 기존 기록을 덮어써요.")
         with mc2:
