@@ -1888,6 +1888,14 @@ with tab2:
             "mood_memo": row.get("메모", "") or "",
         })
 
+    # time_input의 value=는 위젯이 이번 세션에서 "처음" 만들어질 때만 적용되고, 그
+    # 다음부턴 세션에 저장된 예전 값을 계속 씀 - 그래서 다른 탭 갔다 한참 만에
+    # 돌아오면 시간이 예전 그대로 멈춰있었음. 수정 모드가 아닐 때는 렌더링될 때마다
+    # 진짜 현재 시각으로 갱신해줘요 (폼 안이라 실제 리런은 탭 이동/새 렌더링 시점에만
+    # 일어나서, 입력 도중엔 값이 유지돼요).
+    if _mood_edit_idx is None:
+        st.session_state["mood_time"] = datetime.now().time().replace(second=0, microsecond=0)
+
     if _mood_edit_idx is not None:
         mc1, mc2 = st.container(key="Moods_editbanner_btnrow").columns([5, 1])
         with mc1:
