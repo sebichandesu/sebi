@@ -647,11 +647,12 @@ div[class*="st-key-love_note_"] div[data-testid="stColumn"]:nth-child(3) {
         flex-wrap: nowrap !important;
         gap: 6px !important;
     }
+    /* 컬럼 비율([5,1] 같은)은 스트림릿이 이미 인라인 flex 값으로 지정해두는데,
+       예전엔 여기서 flex:1 1 0을 강제로 덮어써서 5:1 비율이 무시되고 버튼이랑
+       안내문이 똑같은 폭으로 눌려서 깨져 보였음 - min-width만 풀어주고
+       비율(flex)은 스트림릿이 준 값을 그대로 쓰도록 둠 */
     div[class*="_btnrow"] div[data-testid="stColumn"] {
         min-width: 0 !important;
-        width: auto !important;
-        flex: 1 1 0 !important;
-        padding: 0 2px !important;
     }
     /* 사랑고백 카드의 수정/삭제 아이콘 버튼 줄도 동일하게 */
     div[class*="st-key-love_note_"] div[data-testid="stHorizontalBlock"] {
