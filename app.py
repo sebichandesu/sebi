@@ -231,7 +231,9 @@ button[data-testid*="primary"]:active {
     transform: translateY(-2px) scale(1.02);
 }
 
-/* 달력 이동(◀▶) - 미니멀 고스트 버튼 (옷 기록 달력 + 기분 기록 달력 공통) */
+/* 달력 이동(◀▶) - 미니멀 고스트 버튼 (옷 기록 달력 + 기분 기록 달력 공통).
+   use_container_width=True라 칸 너비만큼 늘어나 버튼이 커 보이길래, 실제 크기는
+   글자 크기만큼만 차지하고 칸 안에서 가운데 정렬되도록 함 */
 .st-key-outfit_cal_prev button, .st-key-outfit_cal_next button,
 .st-key-mood_cal_prev button, .st-key-mood_cal_next button {
     background-color: transparent !important;
@@ -239,7 +241,11 @@ button[data-testid*="primary"]:active {
     border: 1.5px solid var(--border) !important;
     box-shadow: none !important;
     border-radius: 10px;
-    padding: 0.45rem 0.9rem;
+    padding: 0.3rem 0.6rem !important;
+    width: auto !important;
+    min-width: 0 !important;
+    margin: 0 auto !important;
+    display: flex !important;
 }
 .st-key-outfit_cal_prev button:hover, .st-key-outfit_cal_next button:hover,
 .st-key-mood_cal_prev button:hover, .st-key-mood_cal_next button:hover {
@@ -345,6 +351,7 @@ div[data-testid="stExpanderDetails"] {
 div[data-testid="stExpander"] summary, div[data-testid="stExpander"] > div:first-child {
     font-weight: 700 !important;
     border-radius: 16px;
+    padding: 0.9rem 1.2rem !important;
 }
 /* 접힌 상태에서 테두리가 2겹으로 보이는 문제: 바깥 div(stExpander)에 이미 테두리를
    줬는데, 안쪽의 details/첫 자식 div에도 스트림릿 기본 테두리·그림자가 남아있어서
@@ -1291,14 +1298,15 @@ def _start_outfit_edit(picked_date, row):
     "widget already instantiated" 오류가 납니다. 그래서 값을 별도의 대기(pending)
     상태에 저장해두고, 다음 렌더링에서 폼 위젯이 만들어지기 *전에* 적용합니다.
     """
-    pending = {"outfit_date": picked_date}
+    _v = st.session_state.get("outfit_form_v", 0)
+    pending = {f"outfit_date_{_v}": picked_date}
     for col, _icon in OUTFIT_COLS:
         suffix = OUTFIT_KEY_SUFFIX[col]
         val = row.get(col, "")
-        pending[f"outfit_{suffix}"] = val if val else None
+        pending[f"outfit_{suffix}_{_v}"] = val if val else None
         color_val = row.get(f"{col}색상", "")
-        pending[f"outfit_{suffix}_color"] = color_val if color_val else None
-    pending["outfit_memo"] = row.get("메모", "") or ""
+        pending[f"outfit_{suffix}_color_{_v}"] = color_val if color_val else None
+    pending[f"outfit_memo_{_v}"] = row.get("메모", "") or ""
     st.session_state["_outfit_edit_pending"] = pending
     st.session_state["outfit_edit_date"] = picked_date
     st.session_state["_scroll_to_outfit_form"] = True
@@ -1307,7 +1315,8 @@ def _start_outfit_edit(picked_date, row):
 def _start_outfit_new(picked_date):
     """달력에서 기록이 없는 날짜를 클릭했을 때, 그 날짜가 채워진 채로 새 기록
     폼으로 이동시킵니다 (수정 모드는 아니라서 outfit_edit_date는 건드리지 않아요)."""
-    st.session_state["_outfit_edit_pending"] = {"outfit_date": picked_date}
+    _v = st.session_state.get("outfit_form_v", 0)
+    st.session_state["_outfit_edit_pending"] = {f"outfit_date_{_v}": picked_date}
     st.session_state["_scroll_to_outfit_form"] = True
 
 
@@ -1664,6 +1673,14 @@ with tab1:
     df = storage.load_df("Outfits")
     st.markdown(f'<p class="section-title">오늘 뭐 입었지? · 총 {len(df)}개 기록</p>', unsafe_allow_html=True)
 
+    # 아이템/색상 selectbox는 accept_new_options=True라서, 세션 상태 값만 지워서는
+    # 방금 새로 입력했던 글자가 화면에 그대로 남아있는 경우가 있어요(위젯 내부 표시
+    # 상태가 완전히 안 지워짐). 그래서 위젯 key 뒤에 버전 번호를 붙여두고, 기록/취소
+    # 할 때마다 버전을 올려서 완전히 새 위젯으로 취급되게 만들어 확실히 비웁니다.
+    if "outfit_form_v" not in st.session_state:
+        st.session_state["outfit_form_v"] = 0
+    _ov = st.session_state["outfit_form_v"]
+
     # 달력에서 "이 날짜 수정"을 누르면 값이 여기(위젯이 만들어지기 전)에서 반영돼요.
     _pending_edit = st.session_state.pop("_outfit_edit_pending", None)
     if _pending_edit:
@@ -1708,20 +1725,17 @@ with tab1:
     _COLOR_MAPS = {col: _item_color_map(col, f"{col}색상") for col, _ in OUTFIT_COLS}
 
     def _on_item_change(col: str):
+        _v = st.session_state.get("outfit_form_v", 0)
         suffix = OUTFIT_KEY_SUFFIX[col]
-        val = st.session_state.get(f"outfit_{suffix}")
+        val = st.session_state.get(f"outfit_{suffix}_{_v}")
         if val:
             matched = _COLOR_MAPS[col].get(str(val).strip())
             if matched:
-                st.session_state[f"outfit_{suffix}_color"] = matched
+                st.session_state[f"outfit_{suffix}_color_{_v}"] = matched
 
     def _clear_outfit_form_state():
-        for _col, _ in OUTFIT_COLS:
-            _suffix = OUTFIT_KEY_SUFFIX[_col]
-            st.session_state.pop(f"outfit_{_suffix}", None)
-            st.session_state.pop(f"outfit_{_suffix}_color", None)
-        st.session_state.pop("outfit_memo", None)
-        st.session_state.pop("outfit_date", None)
+        # 버전을 올려서 다음 렌더링부터는 완전히 새 위젯(빈 상태)으로 취급되게 함.
+        st.session_state["outfit_form_v"] = st.session_state.get("outfit_form_v", 0) + 1
         st.session_state.pop("outfit_edit_date", None)
         st.session_state.pop("_outfit_edit_pending", None)
 
@@ -1737,38 +1751,38 @@ with tab1:
 
     with st.expander("✏️ 기록하기", expanded=True, key="outfit_form_exp"):
         with st.container(border=True, key="outfit_form_card"):
-            d = st.date_input("날짜", value=date.today(), key="outfit_date")
+            d = st.date_input("날짜", value=date.today(), key=f"outfit_date_{_ov}")
 
             st.markdown('<p class="sub-label">아이템</p>', unsafe_allow_html=True)
             c1, c2, c3, c4, c5 = st.columns(5, gap="small")
             with c1:
                 top = st.selectbox(
                     "상의", options=_outfit_options("상의"), index=None,
-                    placeholder="선택/입력", accept_new_options=True, key="outfit_top",
+                    placeholder="선택/입력", accept_new_options=True, key=f"outfit_top_{_ov}",
                     on_change=_on_item_change, args=("상의",),
                 )
             with c2:
                 bottom = st.selectbox(
                     "하의", options=_outfit_options("하의"), index=None,
-                    placeholder="선택/입력", accept_new_options=True, key="outfit_bottom",
+                    placeholder="선택/입력", accept_new_options=True, key=f"outfit_bottom_{_ov}",
                     on_change=_on_item_change, args=("하의",),
                 )
             with c3:
                 bag = st.selectbox(
                     "가방", options=_outfit_options("가방"), index=None,
-                    placeholder="선택/입력", accept_new_options=True, key="outfit_bag",
+                    placeholder="선택/입력", accept_new_options=True, key=f"outfit_bag_{_ov}",
                     on_change=_on_item_change, args=("가방",),
                 )
             with c4:
                 socks = st.selectbox(
                     "양말", options=_outfit_options("양말"), index=None,
-                    placeholder="선택/입력", accept_new_options=True, key="outfit_socks",
+                    placeholder="선택/입력", accept_new_options=True, key=f"outfit_socks_{_ov}",
                     on_change=_on_item_change, args=("양말",),
                 )
             with c5:
                 shoes = st.selectbox(
                     "신발", options=_outfit_options("신발"), index=None,
-                    placeholder="선택/입력", accept_new_options=True, key="outfit_shoes",
+                    placeholder="선택/입력", accept_new_options=True, key=f"outfit_shoes_{_ov}",
                     on_change=_on_item_change, args=("신발",),
                 )
 
@@ -1777,31 +1791,31 @@ with tab1:
             with cc1:
                 top_color = st.selectbox(
                     "상의 색", options=_COLOR_SELECT_OPTIONS, index=None,
-                    placeholder="색상", accept_new_options=True, key="outfit_top_color",
+                    placeholder="색상", accept_new_options=True, key=f"outfit_top_color_{_ov}",
                 )
             with cc2:
                 bottom_color = st.selectbox(
                     "하의 색", options=_COLOR_SELECT_OPTIONS, index=None,
-                    placeholder="색상", accept_new_options=True, key="outfit_bottom_color",
+                    placeholder="색상", accept_new_options=True, key=f"outfit_bottom_color_{_ov}",
                 )
             with cc3:
                 bag_color = st.selectbox(
                     "가방 색", options=_COLOR_SELECT_OPTIONS, index=None,
-                    placeholder="색상", accept_new_options=True, key="outfit_bag_color",
+                    placeholder="색상", accept_new_options=True, key=f"outfit_bag_color_{_ov}",
                 )
             with cc4:
                 socks_color = st.selectbox(
                     "양말 색", options=_COLOR_SELECT_OPTIONS, index=None,
-                    placeholder="색상", accept_new_options=True, key="outfit_socks_color",
+                    placeholder="색상", accept_new_options=True, key=f"outfit_socks_color_{_ov}",
                 )
             with cc5:
                 shoes_color = st.selectbox(
                     "신발 색", options=_COLOR_SELECT_OPTIONS, index=None,
-                    placeholder="색상", accept_new_options=True, key="outfit_shoes_color",
+                    placeholder="색상", accept_new_options=True, key=f"outfit_shoes_color_{_ov}",
                 )
 
             st.caption("💡 목록에 없는 걸 새로 입력했다면, 다음 칸으로 넘어가기 전에 꼭 Enter를 눌러 확정해주세요.")
-            memo = st.text_input("메모 (선택)", placeholder="예: 좀 더웠음", key="outfit_memo")
+            memo = st.text_input("메모 (선택)", placeholder="예: 좀 더웠음", key=f"outfit_memo_{_ov}")
             submit_label = "💾 수정 완료" if edit_date else "✏️ 기록하기"
             submitted = st.button(submit_label, use_container_width=True, type="primary", key="outfit_submit_btn")
             if submitted:
