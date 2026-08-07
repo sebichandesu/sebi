@@ -1304,6 +1304,13 @@ def _start_outfit_edit(picked_date, row):
     st.session_state["_scroll_to_outfit_form"] = True
 
 
+def _start_outfit_new(picked_date):
+    """달력에서 기록이 없는 날짜를 클릭했을 때, 그 날짜가 채워진 채로 새 기록
+    폼으로 이동시킵니다 (수정 모드는 아니라서 outfit_edit_date는 건드리지 않아요)."""
+    st.session_state["_outfit_edit_pending"] = {"outfit_date": picked_date}
+    st.session_state["_scroll_to_outfit_form"] = True
+
+
 def _merge_day_rows(rows) -> dict:
     """같은 날짜에 기록이 여러 번 나뉘어 저장된 경우(예: 상의만 먼저 기록하고
     나중에 하의를 따로 기록한 경우), 그 날의 모든 행을 합쳐서 하나로 보여줍니다."""
@@ -1421,6 +1428,12 @@ def render_outfit_calendar(df: pd.DataFrame):
         st.caption("이 달엔 기록이 없어요. 날짜를 클릭하면 자세히 볼 수 있어요.")
     elif picked not in day_records:
         st.caption(f"📅 {picked.strftime('%Y-%m-%d (%a)')} · 이 날짜엔 기록이 없어요.")
+        if st.button(
+            f"✏️ {picked.strftime('%m/%d')} 기록하기", key="outfit_cal_new_btn",
+            use_container_width=True,
+        ):
+            _start_outfit_new(picked)
+            st.rerun()
     else:
         st.caption(f"📌 {picked.strftime('%Y-%m-%d (%a)')} · 달력에서 다른 날짜를 클릭하면 바뀌어요.")
         row = _merge_day_rows(day_records[picked])
@@ -1871,7 +1884,7 @@ with tab2:
                 st.rerun()
 
     with st.expander("✏️ 기록하기", expanded=True, key="mood_form_exp"):
-        with st.form("mood_form", clear_on_submit=False):
+        with st.form("mood_form", clear_on_submit=True):
             c1, c2 = st.columns(2, gap="medium")
             with c1:
                 mood_date = st.date_input("날짜", value=date.today(), key="mood_date")
